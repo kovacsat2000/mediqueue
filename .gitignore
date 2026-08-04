@@ -1,0 +1,32 @@
+# --- .NET build output ----------------------------------------------------
+bin/
+obj/
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+TestResults/
+*.binlog
+
+# --- IDE / editor ---------------------------------------------------------
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# --- macOS ----------------------------------------------------------------
+.DS_Store
+
+# --- Local secrets and environment ---------------------------------------
+.env
+*.local.json
+
+# --- Controller session context -------------------------------------------
+# Working notes that drive development but are not part of the submission.
+/context/

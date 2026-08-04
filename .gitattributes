@@ -1,0 +1,10 @@
+# Normalise line endings on checkin. The Avalonia templates emit CRLF while
+# every other .NET template emits LF; without this the two would alternate in
+# the history depending on who touched a file last.
+* text=auto eol=lf
+
+# Binary assets — never normalise.
+*.ico binary
+*.png binary
+*.jpg binary
+*.pdf binary
