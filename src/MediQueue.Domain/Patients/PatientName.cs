@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using MediQueue.Domain.Exceptions;
 
 namespace MediQueue.Domain.Patients;
@@ -103,6 +104,16 @@ public sealed record PatientName
 
     // Splitting on whitespace and rejoining trims the ends and collapses runs
     // in one step, so "  Nagy   Péter " becomes "Nagy Péter".
+    //
+    // Composing first matters more than it looks. "á" can arrive either as one
+    // character or as "a" followed by a combining acute — macOS and some input
+    // methods produce the second form — and a combining mark is not a letter,
+    // so a decomposed "Kovács" was being rejected as containing a disallowed
+    // character. Normalising also makes Value canonical, so two spellings of
+    // the same name compare equal and hit the same unique index.
     private static string CollapseWhitespace(string input) =>
-        string.Join(' ', input.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        string.Join(
+            ' ',
+            input.Normalize(NormalizationForm.FormC)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }

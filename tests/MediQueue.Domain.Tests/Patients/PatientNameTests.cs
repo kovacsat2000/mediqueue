@@ -1,3 +1,4 @@
+using System.Text;
 using MediQueue.Domain.Exceptions;
 using MediQueue.Domain.Patients;
 
@@ -64,6 +65,32 @@ public class PatientNameTests
     public void Two_names_that_normalise_to_the_same_text_are_equal()
     {
         PatientName.Create("Nagy  Péter").ShouldBe(PatientName.Create("  Nagy Péter "));
+    }
+
+    [Theory]
+    [InlineData("Kovács Anna")]
+    [InlineData("Dr. Kovács-Nagy Anna")]
+    [InlineData("O'Brien Seán")]
+    [InlineData("Bíró Ödön Ürmös")]
+    public void Accepts_an_accented_name_however_its_accents_are_encoded(string name)
+    {
+        // "á" can arrive as one character or as "a" plus a combining acute —
+        // macOS and some input methods produce the second form. A combining
+        // mark is not a letter, so the decomposed spelling of a perfectly
+        // ordinary Hungarian name was being rejected outright.
+        var decomposed = name.Normalize(NormalizationForm.FormD);
+
+        decomposed.ShouldNotBe(name, "the test is pointless unless the two forms really differ");
+        PatientName.Create(decomposed).Value.ShouldBe(name);
+    }
+
+    [Fact]
+    public void The_same_name_in_either_encoding_is_the_same_name()
+    {
+        // Which matters beyond validation: these two must not become separate
+        // patients, and must hit the same unique index once persisted.
+        PatientName.Create("Kovács Anna")
+            .ShouldBe(PatientName.Create("Kovács Anna".Normalize(NormalizationForm.FormD)));
     }
 
     [Fact]
