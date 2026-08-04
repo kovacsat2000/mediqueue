@@ -12,6 +12,14 @@
   <!-- API -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.16.17" />
+    <!--
+      Serilog.AspNetCore is a curated meta-package: it pins Serilog itself and
+      the Console, Debug and File sinks. Referencing a sink separately would
+      mean keeping a second version in lockstep with Serilog's own pin, and a
+      mismatch surfaces as NU1605 — a build failure here.
+    -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
   </ItemGroup>
 
   <!--
