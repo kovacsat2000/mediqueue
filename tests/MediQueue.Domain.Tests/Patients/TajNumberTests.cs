@@ -32,12 +32,34 @@ public class TajNumberTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData(null)]
+    // A regex anchored with $ also matches before a trailing newline, so a
+    // pasted value used to be accepted and stored ten characters long.
+    [InlineData("123-123-123\n")]
+    [InlineData("123-123-123\r\n")]
+    [InlineData("\n123-123-123")]
+    // \d matches every Unicode decimal digit, not only ASCII. These are digits
+    // as far as .NET is concerned, but they are not a Hungarian TAJ number, and
+    // the checksum arithmetic assumes ASCII.
+    [InlineData("١٢٣-١٢٣-١٢٣")]   // Arabic-Indic
+    [InlineData("１２３-１２３-１２３")]   // fullwidth
+    [InlineData("१२३-१२३-१२३")]   // Devanagari
     public void Rejects_anything_that_is_not_the_dashed_nine_digit_form(string? input)
     {
         TajNumber.TryCreate(input, out var result, out var error).ShouldBeFalse();
 
         result.ShouldBeNull();
         error.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Theory]
+    [InlineData("123-123-123")]
+    [InlineData("673-457-015")]
+    [InlineData("000-000-000")]
+    [InlineData("999-999-999")]
+    public void An_accepted_number_always_stores_exactly_nine_characters(string input)
+    {
+        // The cheapest assertion that would have caught the trailing-newline bug.
+        TajNumber.Create(input).Digits.Length.ShouldBe(9);
     }
 
     [Fact]

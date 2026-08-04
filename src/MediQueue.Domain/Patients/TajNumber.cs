@@ -128,6 +128,16 @@ public sealed partial record TajNumber
         return sum % 10;
     }
 
-    [GeneratedRegex(@"^\d{3}-\d{3}-\d{3}$")]
+    /// <remarks>
+    /// The customer wrote the rule as <c>^\d{3}-\d{3}-\d{3}$</c>, which in .NET
+    /// is looser than it looks and was letting two malformed inputs through:
+    /// <c>$</c> also matches immediately before a trailing newline, so a pasted
+    /// value ending in one produced a "nine digit" number ten characters long;
+    /// and <c>\d</c> matches every Unicode decimal digit, so Arabic-Indic and
+    /// fullwidth forms were accepted for a Hungarian identifier and then fed to
+    /// arithmetic that assumes ASCII. <c>\A</c>, <c>\z</c> and an explicit
+    /// <c>[0-9]</c> say what the rule was always meant to say.
+    /// </remarks>
+    [GeneratedRegex(@"\A[0-9]{3}-[0-9]{3}-[0-9]{3}\z")]
     private static partial Regex AcceptedFormat();
 }
