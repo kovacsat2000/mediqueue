@@ -106,20 +106,34 @@ public class VisitTests
     public void AssignToQueue_is_refused_once_the_visit_is_done()
     {
         var visit = ACompletedVisit();
+        var otherDoctor = Guid.CreateVersion7(Completed);
 
         var exception = Should.Throw<InvalidVisitTransitionException>(
-            () => visit.AssignToQueue(SpecialtyId, DoctorId, Queued));
+            () => visit.AssignToQueue(SpecialtyId, otherDoctor, Completed));
 
         exception.AllowedAlternatives.ShouldBeEmpty();
         visit.Status.ShouldBe(VisitStatus.Done);
+
+        // The refusal must happen before anything is written. A transition that
+        // throws after mutating is the failure mode worth guarding against.
+        visit.DoctorId.ShouldBe(DoctorId);
+        visit.QueuedAt.ShouldBe(Queued);
     }
 
     [Fact]
     public void A_visit_cannot_be_queued_twice()
     {
         var visit = AWaitingVisit();
+        var otherSpecialty = Guid.CreateVersion7(Completed);
+        var otherDoctor = Guid.CreateVersion7(Completed);
 
-        Should.Throw<InvalidVisitTransitionException>(() => visit.AssignToQueue(SpecialtyId, DoctorId, Queued));
+        Should.Throw<InvalidVisitTransitionException>(
+            () => visit.AssignToQueue(otherSpecialty, otherDoctor, Completed));
+
+        // Deliberately different values, so a partial write would be visible.
+        visit.SpecialtyId.ShouldBe(SpecialtyId);
+        visit.DoctorId.ShouldBe(DoctorId);
+        visit.QueuedAt.ShouldBe(Queued);
     }
 
     [Fact]

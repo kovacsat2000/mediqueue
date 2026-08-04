@@ -43,6 +43,47 @@ public class ShortestQueueAssignmentStrategyTests
     }
 
     [Fact]
+    public void The_waiting_queue_outranks_the_treatment_count()
+    {
+        // The criteria are put in conflict on purpose. If the fixture let them
+        // agree, swapping the first two tie-breaks would still pass — which is
+        // exactly what a fall-through test is supposed to catch.
+        var chosen = _strategy.SelectDoctor(SpecialtyId,
+        [
+            new DoctorWorkload(DoctorA, WaitingCount: 1, InTreatmentCount: 5, LastAssignedAt: null),
+            new DoctorWorkload(DoctorB, WaitingCount: 2, InTreatmentCount: 0, LastAssignedAt: null),
+        ]);
+
+        chosen.ShouldBe(DoctorA);
+    }
+
+    [Fact]
+    public void The_treatment_count_outranks_how_long_ago_they_were_last_assigned()
+    {
+        var chosen = _strategy.SelectDoctor(SpecialtyId,
+        [
+            new DoctorWorkload(DoctorA, WaitingCount: 2, InTreatmentCount: 0, LastAssignedAt: Morning),
+            new DoctorWorkload(DoctorB, WaitingCount: 2, InTreatmentCount: 1, LastAssignedAt: null),
+        ]);
+
+        chosen.ShouldBe(DoctorA);
+    }
+
+    [Fact]
+    public void How_long_ago_they_were_last_assigned_outranks_the_identifier()
+    {
+        var chosen = _strategy.SelectDoctor(SpecialtyId,
+        [
+            new DoctorWorkload(DoctorA, WaitingCount: 0, InTreatmentCount: 0, LastAssignedAt: Morning),
+            new DoctorWorkload(DoctorC, WaitingCount: 0, InTreatmentCount: 0, LastAssignedAt: null),
+        ]);
+
+        // DoctorA has the lower identifier and would win the final tie-break,
+        // so choosing DoctorC proves recency is consulted first.
+        chosen.ShouldBe(DoctorC);
+    }
+
+    [Fact]
     public void Falls_through_to_the_least_recently_assigned_when_both_counts_are_equal()
     {
         var chosen = _strategy.SelectDoctor(SpecialtyId,
