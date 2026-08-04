@@ -1,0 +1,16 @@
+; Symbols that must never appear in MediQueue.Domain.
+;
+; The domain layer is pure: given the same inputs it must produce the same
+; outputs, every time, with no hidden dependency on the machine it runs on.
+; Reading the clock or generating a random identifier breaks that quietly —
+; the code still compiles, the tests still pass, and the non-determinism only
+; shows up later as a flaky test or an unreproducible bug.
+;
+; Format: <DocumentationCommentId>;<message shown when the rule fires>
+
+P:System.DateTime.Now;Domain must receive the current time as a parameter
+P:System.DateTime.UtcNow;Domain must receive the current time as a parameter
+P:System.DateTimeOffset.Now;Domain must receive the current time as a parameter
+P:System.DateTimeOffset.UtcNow;Domain must receive the current time as a parameter
+M:System.Guid.NewGuid;Use Guid.CreateVersion7(now) so ids are time-ordered
+M:System.Guid.CreateVersion7;Use the Guid.CreateVersion7(DateTimeOffset) overload; the parameterless one reads the system clock

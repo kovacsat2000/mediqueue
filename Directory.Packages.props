@@ -9,6 +9,11 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
+  <!-- Build-time only. Contributes nothing to any compiled output. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
+  </ItemGroup>
+
   <!-- API -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
