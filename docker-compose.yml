@@ -1,0 +1,25 @@
+services:
+
+  db:
+    image: postgres:17-alpine
+    container_name: mediqueue-db
+    environment:
+      POSTGRES_DB: mediqueue
+      POSTGRES_USER: mediqueue
+      POSTGRES_PASSWORD: mediqueue
+    ports:
+      - "5432:5432"
+    volumes:
+      - mediqueue-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Named database and user explicitly: without them pg_isready probes the
+      # `root` database and reports the container healthy before it is usable.
+      test: ["CMD-SHELL", "pg_isready -U mediqueue -d mediqueue"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  mediqueue-pgdata:
