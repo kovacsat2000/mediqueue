@@ -1,0 +1,30 @@
+<Project>
+
+  <!--
+    Applied to every project in the solution. Anything that is true of the
+    whole system belongs here; anything project-specific belongs in the
+    .csproj.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- A warning is a defect that has not been triaged yet. Fail on it. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Deterministic assembly identity across every project. -->
+    <Product>MediQueue</Product>
+    <Company>MediQueue</Company>
+    <Version>0.1.0</Version>
+
+    <!--
+      Keep the informational version clean: without this the SDK appends
+      "+<git sha>", which would leak into the /health response body.
+    -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+</Project>
