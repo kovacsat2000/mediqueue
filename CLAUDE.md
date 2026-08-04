@@ -110,9 +110,20 @@ These come from the specification and from the decision log. Violating any of th
 
 ---
 
+## Build hygiene established in P0 — do not undo
+
+- **`nuget.config` at the root clears inherited package sources.** This machine has a private Azure Artifacts feed in its user-level config; central package management fails to resolve across multiple sources. Do not remove the `<clear />`.
+- **`Microsoft.OpenApi` is pinned forward to 2.7.5** to close a high-severity advisory that the transitive 2.0.0 carries. Do not relax the pin. Never suppress `NU1903`.
+- **`.gitattributes` forces `eol=lf`.** The Avalonia templates emit CRLF; without this the history alternates.
+- **`global.json` sets `allowPrerelease: false`.** Outside Visual Studio this defaults to true, which would silently select a preview SDK.
+- **`app.UseHttpsRedirection()` applies outside Development only.** Under the http launch profile it logs a warning on every request, which pollutes the demo.
+- **`EnforceCodeStyleInBuild` is effectively decorative** as configured: IDE analyzers default to *silent*, and raising their severity makes the stock templates fail to compile. `dotnet format` is the real gate. Do not raise IDE severities without a decision from the controller session.
+
+---
+
 ## Testing
 
-- **xUnit + NSubstitute + Shouldly.** Not FluentAssertions — v8+ requires a paid commercial licence.
+- **xUnit v2 (2.9.3) + NSubstitute + Shouldly.** Not FluentAssertions — v8+ requires a paid commercial licence. xunit.v3 was considered and declined (see `context/decisions.md` D-22); do not migrate without a controller decision.
 - **Domain tests are pure**: no database, no mocks of infrastructure, no async.
 - The state machine test asserts **all sixteen ordered `(from, to)` pairs**, allowed and denied. Do not shorten it to the happy path.
 - Validation tests cover: valid input, empty, digits in the name, wrong TAJ format, and the checksum rule both enabled and disabled.
@@ -130,7 +141,9 @@ These come from the specification and from the decision log. Violating any of th
   `test(domain): cover all 16 ordered state transition pairs`
   `fix(api): return 409 with valid alternatives on invalid transition`
 - Never force-push to `main`. Never rewrite pushed history.
-- Run `dotnet format && dotnet build && dotnet test` before every commit.
+- Run `dotnet format && dotnet build && dotnet test` before every commit. CI runs `dotnet format --verify-no-changes` as a build step, so an unformatted commit turns the pipeline red.
+- **Every commit must build.** In particular: a project is added to `MediQueue.sln` in the *same* commit that creates its `.csproj`. Never stage solution entries ahead of the projects they reference — that produces a commit that cannot restore, and it is exactly how the one defective commit in the P0 history happened.
+- Before committing a series, sanity-check it: `git stash` any work in progress, then build the intermediate states if a commit reorders or splits files across projects.
 
 ---
 
