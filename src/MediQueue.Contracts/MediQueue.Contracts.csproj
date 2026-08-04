@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The wire format shared by the server and both desktop clients: DTOs and
+    the enums that travel with them. It references nothing so that a client
+    can depend on the contract without dragging in the server.
+  -->
+
+</Project>

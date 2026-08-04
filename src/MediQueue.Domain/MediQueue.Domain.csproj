@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The innermost layer: entities, value objects, the visit state machine and
+    the business rules. It references nothing, by design — that is what makes
+    the rules testable without a database, a web server or a mock.
+  -->
+
+</Project>

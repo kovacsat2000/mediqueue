@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Implements the Application layer's interfaces: EF Core persistence,
+    the audit interceptor, authentication and the SignalR notifier.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\MediQueue.Application\MediQueue.Application.csproj" />
+    <ProjectReference Include="..\MediQueue.Domain\MediQueue.Domain.csproj" />
+    <ProjectReference Include="..\MediQueue.Contracts\MediQueue.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

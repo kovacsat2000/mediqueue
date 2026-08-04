@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Everything the two desktop shells share: the HTTP client, the SignalR
+    client, authentication state and the common view models.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\MediQueue.Contracts\MediQueue.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

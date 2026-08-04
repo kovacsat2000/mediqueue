@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Use cases and the interfaces the outer layers implement. -->
+  <ItemGroup>
+    <ProjectReference Include="..\MediQueue.Domain\MediQueue.Domain.csproj" />
+    <ProjectReference Include="..\MediQueue.Contracts\MediQueue.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>
