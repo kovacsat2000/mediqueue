@@ -1,3 +1,6 @@
+using MediQueue.Domain.Exceptions;
+using MediQueue.Domain.Validation;
+
 namespace MediQueue.Domain.Specialties;
 
 /// <summary>
@@ -5,6 +8,9 @@ namespace MediQueue.Domain.Specialties;
 /// </summary>
 public sealed class Specialty
 {
+    /// <summary>The longest specialty name the system accepts. The database column is sized from this.</summary>
+    public const int MaxNameLength = 100;
+
     private Specialty(Guid id, string name)
     {
         Id = id;
@@ -21,6 +27,7 @@ public sealed class Specialty
     /// <param name="name">The name, as the practice refers to it.</param>
     /// <param name="now">The current time, supplied by the caller so the identifier is deterministic.</param>
     /// <returns>The new specialty.</returns>
+    /// <exception cref="ValidationException"><paramref name="name"/> is blank or too long.</exception>
     public static Specialty Create(string name, DateTimeOffset now) =>
-        new(Guid.CreateVersion7(now), name);
+        new(Guid.CreateVersion7(now), TextRules.Required(name, nameof(Name), MaxNameLength));
 }

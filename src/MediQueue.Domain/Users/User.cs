@@ -1,4 +1,5 @@
 using MediQueue.Domain.Exceptions;
+using MediQueue.Domain.Validation;
 
 namespace MediQueue.Domain.Users;
 
@@ -21,6 +22,12 @@ namespace MediQueue.Domain.Users;
 /// </remarks>
 public sealed class User
 {
+    /// <summary>The longest username the system accepts. The database column is sized from this.</summary>
+    public const int MaxUsernameLength = 50;
+
+    /// <summary>The longest full name the system accepts. The database column is sized from this.</summary>
+    public const int MaxFullNameLength = 200;
+
     private User(
         Guid id,
         string username,
@@ -76,8 +83,16 @@ public sealed class User
     /// <param name="passwordHash">The hashed password.</param>
     /// <param name="now">The current time, supplied by the caller so the identifier is deterministic.</param>
     /// <returns>The new assistant.</returns>
+    /// <exception cref="ValidationException"><paramref name="username"/> or <paramref name="fullName"/> is blank or too long.</exception>
     public static User CreateAssistant(string username, string fullName, string passwordHash, DateTimeOffset now) =>
-        new(Guid.CreateVersion7(now), username, fullName, passwordHash, UserRole.Assistant, specialtyId: null, isActive: true);
+        new(
+            Guid.CreateVersion7(now),
+            TextRules.RequiredSingleWord(username, nameof(Username), MaxUsernameLength),
+            TextRules.Required(fullName, nameof(FullName), MaxFullNameLength),
+            passwordHash,
+            UserRole.Assistant,
+            specialtyId: null,
+            isActive: true);
 
     /// <summary>Creates a doctor, who must belong to a specialty.</summary>
     /// <param name="username">The name used to sign in.</param>
@@ -87,11 +102,19 @@ public sealed class User
     /// <param name="now">The current time, supplied by the caller so the identifier is deterministic.</param>
     /// <returns>The new doctor.</returns>
     /// <exception cref="DomainException"><paramref name="specialtyId"/> is empty.</exception>
+    /// <exception cref="ValidationException"><paramref name="username"/> or <paramref name="fullName"/> is blank or too long.</exception>
     public static User CreateDoctor(
         string username,
         string fullName,
         string passwordHash,
         Guid specialtyId,
         DateTimeOffset now) =>
-        new(Guid.CreateVersion7(now), username, fullName, passwordHash, UserRole.Doctor, specialtyId, isActive: true);
+        new(
+            Guid.CreateVersion7(now),
+            TextRules.RequiredSingleWord(username, nameof(Username), MaxUsernameLength),
+            TextRules.Required(fullName, nameof(FullName), MaxFullNameLength),
+            passwordHash,
+            UserRole.Doctor,
+            specialtyId,
+            isActive: true);
 }

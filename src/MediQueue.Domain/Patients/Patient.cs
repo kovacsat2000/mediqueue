@@ -1,3 +1,6 @@
+using MediQueue.Domain.Exceptions;
+using MediQueue.Domain.Validation;
+
 namespace MediQueue.Domain.Patients;
 
 /// <summary>
@@ -12,6 +15,9 @@ namespace MediQueue.Domain.Patients;
 /// </remarks>
 public sealed class Patient
 {
+    /// <summary>The longest address the system accepts. The database column is sized from this.</summary>
+    public const int MaxAddressLength = 300;
+
     private Patient(Guid id, PatientName fullName, string address, TajNumber taj, DateTimeOffset createdAt)
     {
         Id = id;
@@ -42,6 +48,12 @@ public sealed class Patient
     /// <param name="taj">The patient's TAJ number.</param>
     /// <param name="now">The current time, supplied by the caller so the result is deterministic.</param>
     /// <returns>The new patient.</returns>
+    /// <exception cref="ValidationException"><paramref name="address"/> is blank or too long.</exception>
     public static Patient Create(PatientName fullName, string address, TajNumber taj, DateTimeOffset now) =>
-        new(Guid.CreateVersion7(now), fullName, address, taj, now);
+        new(
+            Guid.CreateVersion7(now),
+            fullName,
+            TextRules.Required(address, nameof(Address), MaxAddressLength),
+            taj,
+            now);
 }

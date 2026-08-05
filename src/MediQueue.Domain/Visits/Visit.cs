@@ -1,5 +1,6 @@
 using MediQueue.Domain.Auditing;
 using MediQueue.Domain.Exceptions;
+using MediQueue.Domain.Validation;
 
 namespace MediQueue.Domain.Visits;
 
@@ -22,6 +23,12 @@ namespace MediQueue.Domain.Visits;
 /// </remarks>
 public sealed class Visit
 {
+    /// <summary>The longest complaint the system accepts. The database column is sized from this.</summary>
+    public const int MaxComplaintLength = 1000;
+
+    /// <summary>The longest diagnosis the system accepts. The database column is sized from this.</summary>
+    public const int MaxDiagnosisLength = 2000;
+
     private Visit(Guid id, Guid patientId, string complaint, DateTimeOffset registeredAt)
     {
         Id = id;
@@ -86,8 +93,13 @@ public sealed class Visit
     /// <param name="complaint">What the patient came in with.</param>
     /// <param name="now">The current time, supplied by the caller so the result is deterministic.</param>
     /// <returns>The new visit.</returns>
+    /// <exception cref="ValidationException"><paramref name="complaint"/> is blank or too long.</exception>
     public static Visit Register(Guid patientId, string complaint, DateTimeOffset now) =>
-        new(Guid.CreateVersion7(now), patientId, complaint, now);
+        new(
+            Guid.CreateVersion7(now),
+            patientId,
+            TextRules.Required(complaint, nameof(Complaint), MaxComplaintLength),
+            now);
 
     /// <summary>Puts the visit into a doctor's queue.</summary>
     /// <param name="specialtyId">The specialty the visit was routed to.</param>
@@ -134,12 +146,7 @@ public sealed class Visit
                 $"A diagnosis can only be recorded while the visit is '{VisitStatus.InTreatment}'; this visit is '{Status}'.");
         }
 
-        if (string.IsNullOrWhiteSpace(diagnosis))
-        {
-            throw new DomainException("A diagnosis cannot be blank.");
-        }
-
-        Diagnosis = diagnosis;
+        Diagnosis = TextRules.Required(diagnosis, nameof(Diagnosis), MaxDiagnosisLength);
     }
 
     /// <summary>Releases the patient and completes the visit.</summary>
