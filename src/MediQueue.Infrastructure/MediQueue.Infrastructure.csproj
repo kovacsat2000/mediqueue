@@ -5,6 +5,17 @@
     the audit interceptor, authentication and the SignalR notifier.
   -->
   <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- PasswordHasher<T> only, for the seeder; P3 reuses it for login. -->
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <!-- Design-time only: `dotnet ef` needs it, the running application does not. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MediQueue.Application\MediQueue.Application.csproj" />
     <ProjectReference Include="..\MediQueue.Domain\MediQueue.Domain.csproj" />
     <ProjectReference Include="..\MediQueue.Contracts\MediQueue.Contracts.csproj" />
