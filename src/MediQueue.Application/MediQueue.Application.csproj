@@ -1,5 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <!--
+      IPasswordHasher<T> only. A framework abstraction, not an infrastructure
+      type: the use case verifies a hash without knowing which algorithm or
+      which store produced it.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+  </ItemGroup>
+
   <!-- Use cases and the interfaces the outer layers implement. -->
   <ItemGroup>
     <ProjectReference Include="..\MediQueue.Domain\MediQueue.Domain.csproj" />
