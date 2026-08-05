@@ -14,7 +14,9 @@ It is a proof of concept built to be **presented and defended live, line by line
 
 ## Non-negotiables
 
-1. **Everything in this repository is in English.** Code, identifiers, comments, commit messages, documentation, UI labels, test names. The only exception is *seed data values* (patient and doctor names, addresses, specialty names), which are Hungarian so the demo reads naturally.
+1. **Everything in this repository is in English.** Code, identifiers, comments, commit messages, documentation, UI labels, test names. Two exceptions:
+   - **Seed and test data *values*** — patient and doctor names, addresses, specialty names, complaints, diagnoses. These are Hungarian, so the demo reads naturally and so the tests exercise the character set the system actually receives. `"Kovács Anna"` as a test value is data, not prose.
+   - **Legal citations** keep their official Hungarian designation (`1996. évi XX. törvény, 2. sz. melléklet`), the way any statute is cited untranslated. The surrounding explanation is English.
 2. **No time-based scoping.** Never propose cutting, deferring, or timeboxing work because of time. Time is not a constraint in this project. If something should be built, build it.
 3. **Never invent version numbers or API shapes from memory.** Check the actual installed SDK, the actual package version, and the actual API before using it. If a package's current version is unknown, add it with `dotnet add package <name>` and let NuGet resolve, then record the resolved version in `Directory.Packages.props`.
 4. **Do not silently change a decision recorded in `context/decisions.md`.** If a decision turns out to be wrong, stop, explain why, and let the controller session re-decide.
@@ -106,7 +108,11 @@ These come from the specification and from the decision log. Violating any of th
 6. **Audit is captured in the EF Core `SaveChangesInterceptor`,** never by application services calling an audit method. If something is not being audited, fix the interceptor.
 7. **Sensitive audit values are redacted for assistants** (`***` plus a `redacted: true` flag), never omitted silently.
 8. **All timestamps are `DateTimeOffset` in UTC.** Formatting for display is the client's job.
-9. **All primary keys are `Guid.CreateVersion7()`.** Never `Guid.NewGuid()`.
+9. **All primary keys are `Guid.CreateVersion7(now)`** — the `DateTimeOffset` overload. Never `Guid.NewGuid()`, and never the parameterless `CreateVersion7()`: it reads the system clock, which `Domain` may not do. Both are enforced by `BannedSymbols.txt`.
+10. **`Domain` reads no ambient state.** No clock, no random source. Timestamps are parameters. Outside `Domain`, the clock is `TimeProvider` injected through DI — never `DateTimeOffset.UtcNow` inline, so tests can substitute `FakeTimeProvider`.
+11. **`DomainException` means a caller broke a business rule** and becomes a 4xx. Framework guard clauses (`ArgumentNullException.ThrowIfNull`) mean *our own code has a bug* and become a 500. Do not collapse the two.
+12. **Value objects canonicalise before they validate.** Regex anchors are `\A` and `\z`, never `^` and `$` (`$` matches before a trailing newline). Digit classes are `[0-9]`, never `\d` (which matches every Unicode numeral). Text input is composed to NFC before character rules run.
+13. **A soft-deleted `Visit` is frozen.** Every mutating method guards on it, and EF Core applies a global query filter as a second layer.
 
 ---
 
