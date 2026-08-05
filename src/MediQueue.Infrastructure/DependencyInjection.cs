@@ -1,4 +1,7 @@
+using MediQueue.Application.Abstractions;
 using MediQueue.Domain.Users;
+using MediQueue.Infrastructure.Authentication;
+using MediQueue.Infrastructure.Directory;
 using MediQueue.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +44,19 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
         services.AddScoped<DatabaseSeeder>();
+
+        // Token issuance, and the identity of whoever is making the request.
+        // ICurrentUser reads the validated principal, so it needs the accessor.
+        services.AddHttpContextAccessor();
+        services.AddSingleton<ITokenIssuer, JwtTokenIssuer>();
+        services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+
+        // Read models. Narrow, purpose-built lookups rather than repositories —
+        // whether anything broader belongs in front of persistence is a P4 call.
+        services.AddScoped<IUserDirectory, UserDirectory>();
+        services.AddScoped<ISpecialtyDirectory, SpecialtyDirectory>();
+
+        services.AddMediQueueAuthentication(configuration);
 
         return services;
     }

@@ -5,6 +5,7 @@
     the audit interceptor, authentication and the SignalR notifier.
   -->
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- PasswordHasher<T> only, for the seeder; P3 reuses it for login. -->
     <PackageReference Include="Microsoft.Extensions.Identity.Core" />
