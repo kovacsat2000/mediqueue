@@ -123,6 +123,10 @@ These come from the specification and from the decision log. Violating any of th
 - **`.gitattributes` forces `eol=lf`.** The Avalonia templates emit CRLF; without this the history alternates.
 - **`global.json` sets `allowPrerelease: false`.** Outside Visual Studio this defaults to true, which would silently select a preview SDK.
 - **`app.UseHttpsRedirection()` applies outside Development only.** Under the http launch profile it logs a warning on every request, which pollutes the demo.
+- **The EF Core family is pinned as a unit** (D-35). Npgsql declares a lower EF Core version than `Design` resolves, and `PrivateAssets="all"` stops the higher one flowing onward — so two projects silently compile against different versions. Do not unpin.
+- **`Microsoft.EntityFrameworkCore.Design` is referenced from both Infrastructure and Api**, both `PrivateAssets="all"`. `dotnet ef` resolves the `DbContext` through the *startup* project's DI, so it needs it in Api too.
+- **Database identifiers are EF's default PascalCase** (D-36). `select * from "Visits"` needs the quotes at a `psql` prompt. Do not add a naming-convention package.
+- **The `xmin` concurrency token is a shadow property**, not a field on `Visit`. The generated migration declares an `xmin` column that Npgsql's SQL generator deliberately never emits — that is correct, not a bug to fix.
 - **`EnforceCodeStyleInBuild` is effectively decorative** as configured: IDE analyzers default to *silent*, and raising their severity makes the stock templates fail to compile. `dotnet format` is the real gate. Do not raise IDE severities without a decision from the controller session.
 
 ---
@@ -135,6 +139,8 @@ These come from the specification and from the decision log. Violating any of th
 - Validation tests cover: valid input, empty, digits in the name, wrong TAJ format, and the checksum rule both enabled and disabled.
 - **Integration tests** use `WebApplicationFactory` with Testcontainers running real PostgreSQL. No in-memory provider — it hides provider-specific behaviour, which defeats the purpose.
 - A new business rule without a test is not finished.
+- **Mutation testing is expected in every phase report**, not optional. For each new rule, state which mutant your tests actually kill and how many fail. A test that survives its mutant is not a test — and if a mutant fails the whole suite for a structural reason rather than an assertion, say so instead of claiming the number.
+- Persistence tests share one container. Tests needing an empty schema get their own migrated database; the rest isolate with unique TAJs and usernames. Note that a GUID suffix does not work as an isolation token — `PatientName` rejects digits.
 
 ---
 
