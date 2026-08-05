@@ -10,6 +10,8 @@ public class VisitTests
     private static readonly DateTimeOffset Queued = new(2026, 8, 4, 9, 20, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset CalledIn = new(2026, 8, 4, 10, 5, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset Completed = new(2026, 8, 4, 10, 30, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Deleted = new(2026, 8, 4, 11, 0, 0, TimeSpan.Zero);
+    private static readonly Guid DeletedBy = Guid.CreateVersion7(Deleted);
 
     private static readonly Guid PatientId = Guid.CreateVersion7(Registered);
     private static readonly Guid SpecialtyId = Guid.CreateVersion7(Registered);
@@ -211,6 +213,71 @@ public class VisitTests
             visit.IsDeleted.ShouldBeTrue();
             visit.Status.ShouldBe(statusBefore);
         }
+    }
+
+    public static TheoryData<string> MutatingMethods() =>
+        [nameof(Visit.AssignToQueue), nameof(Visit.CallIn), nameof(Visit.RecordDiagnosis), nameof(Visit.Release)];
+
+    [Theory]
+    [MemberData(nameof(MutatingMethods))]
+    public void A_deleted_visit_refuses_every_change_and_is_left_untouched(string method)
+    {
+        // Built at the state each method would otherwise be legal from, so the
+        // deletion guard is what refuses it rather than the state machine.
+        var visit = method switch
+        {
+            nameof(Visit.AssignToQueue) => ARegisteredVisit(),
+            nameof(Visit.CallIn) => AWaitingVisit(),
+            _ => AVisitInTreatment(),
+        };
+
+        var statusBefore = visit.Status;
+        visit.SoftDelete(DeletedBy, Deleted);
+
+        Action attempt = method switch
+        {
+            nameof(Visit.AssignToQueue) => () => visit.AssignToQueue(SpecialtyId, DoctorId, Completed),
+            nameof(Visit.CallIn) => () => visit.CallIn(Completed),
+            nameof(Visit.RecordDiagnosis) => () => visit.RecordDiagnosis("Migrén"),
+            _ => () => visit.Release(Completed),
+        };
+
+        var exception = Should.Throw<DomainException>(attempt);
+
+        exception.Message.ShouldContain(visit.Id.ToString());
+        exception.Message.ShouldContain("deleted");
+        exception.ShouldNotBeOfType<InvalidVisitTransitionException>();
+
+        visit.Status.ShouldBe(statusBefore);
+        visit.Diagnosis.ShouldBeNull();
+        visit.CompletedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Deleting_twice_throws_rather_than_overwriting_the_first_deleter()
+    {
+        var visit = AWaitingVisit();
+        var secondUser = Guid.CreateVersion7(Completed);
+
+        visit.SoftDelete(DeletedBy, Deleted);
+        Should.Throw<DomainException>(() => visit.SoftDelete(secondUser, Completed));
+
+        // Losing who deleted the record first is the defect this closes.
+        visit.DeletedByUserId.ShouldBe(DeletedBy);
+        visit.DeletedAt.ShouldBe(Deleted);
+    }
+
+    [Fact]
+    public void The_deletion_guard_runs_before_the_state_machine()
+    {
+        // A deleted visit in a state the move is illegal from must complain
+        // about the deletion, not about the transition — otherwise the caller
+        // is told to fix the wrong thing.
+        var visit = ACompletedVisit();
+        visit.SoftDelete(DeletedBy, Deleted);
+
+        Should.Throw<DomainException>(() => visit.CallIn(Completed))
+            .ShouldNotBeOfType<InvalidVisitTransitionException>();
     }
 
     [Fact]
