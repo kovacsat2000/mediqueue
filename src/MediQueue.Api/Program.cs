@@ -1,4 +1,7 @@
+using MediQueue.Api.Errors;
 using MediQueue.Api.Health;
+using MediQueue.Api.OpenApi;
+using MediQueue.Application.Authentication;
 using MediQueue.Infrastructure;
 using MediQueue.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +27,20 @@ try
         .Enrich.FromLogContext());
 
     builder.Services.AddControllers();
-    builder.Services.AddOpenApi();
+
+    // The bearer scheme is declared explicitly: .NET 10 does not infer it from
+    // the authentication configuration, and without it the reference UI has no
+    // way to send a token.
+    builder.Services.AddOpenApi(options =>
+        options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
+
+    // Every failure leaves through one door, as RFC 9457 problem documents.
+    builder.Services.AddProblemDetails();
+    builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
+
+    // The login use case. Application services are registered here because the
+    // API is the composition root; they depend only on abstractions.
+    builder.Services.AddScoped<AuthenticationService>();
 
     // The composition root, and the only place the API touches Infrastructure.
     builder.Services.AddInfrastructure(builder.Configuration);
@@ -54,6 +70,9 @@ try
             .SeedAsync();
     }
 
+    // First in the pipeline, so it catches everything after it.
+    app.UseExceptionHandler();
+
     // One structured event per request carrying the method, path, status code
     // and elapsed time, in place of the several ASP.NET Core emits by default.
     app.UseSerilogRequestLogging();
@@ -63,8 +82,10 @@ try
         // The .NET 10 template generates the OpenAPI document but deliberately
         // ships no UI, so Scalar renders that same document. Development only —
         // the schema is an information-disclosure surface in production.
-        app.MapOpenApi();
-        app.MapScalarApiReference(options => options.WithTitle("MediQueue API"));
+        // Anonymous so the reference UI can load the document it renders. Both
+        // are Development-only, so this opens nothing in a deployed environment.
+        app.MapOpenApi().AllowAnonymous();
+        app.MapScalarApiReference(options => options.WithTitle("MediQueue API")).AllowAnonymous();
     }
 
     // HTTPS redirection is a deployment concern. Locally the API is served over
@@ -76,6 +97,7 @@ try
         app.UseHttpsRedirection();
     }
 
+    app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapControllers();
@@ -93,3 +115,10 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+/// <summary>
+/// Named so the integration tests can boot the real application through
+/// <c>WebApplicationFactory</c>. Top-level statements generate an internal entry
+/// point, which the factory cannot reach.
+/// </summary>
+public partial class Program;

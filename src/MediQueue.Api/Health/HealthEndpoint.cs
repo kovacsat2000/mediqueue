@@ -34,7 +34,11 @@ public static class HealthEndpoint
         endpoints.MapHealthChecks("/health", new HealthCheckOptions
         {
             ResponseWriter = WriteResponseAsync,
-        });
+        })
+        // One of only two anonymous endpoints. A health check that needed a
+        // token could not be read by the thing most likely to ask: a load
+        // balancer, a container orchestrator, or a monitor.
+        .AllowAnonymous();
 
         return endpoints;
     }
