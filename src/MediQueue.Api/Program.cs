@@ -1,4 +1,7 @@
 using MediQueue.Api.Health;
+using MediQueue.Infrastructure;
+using MediQueue.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
 
@@ -22,9 +25,34 @@ try
 
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
-    builder.Services.AddHealthChecks();
+
+    // The composition root, and the only place the API touches Infrastructure.
+    builder.Services.AddInfrastructure(builder.Configuration);
+
+    builder.Services
+        .AddHealthChecks()
+        // Reports whether the API can actually reach PostgreSQL, not merely that
+        // the process is up. A health check that is green while the database is
+        // unreachable is worse than no health check.
+        .AddDbContextCheck<MediQueueDbContext>("database");
 
     var app = builder.Build();
+
+    // Migrate and seed before serving traffic. Development only: applying
+    // migrations automatically is convenient locally and unacceptable in
+    // production, where a schema change is a deliberate, reviewed step.
+    if (app.Environment.IsDevelopment())
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+
+        await scope.ServiceProvider
+            .GetRequiredService<MediQueueDbContext>()
+            .Database.MigrateAsync();
+
+        await scope.ServiceProvider
+            .GetRequiredService<DatabaseSeeder>()
+            .SeedAsync();
+    }
 
     // One structured event per request carrying the method, path, status code
     // and elapsed time, in place of the several ASP.NET Core emits by default.
