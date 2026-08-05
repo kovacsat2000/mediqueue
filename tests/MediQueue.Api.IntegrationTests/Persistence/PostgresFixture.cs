@@ -25,6 +25,17 @@ public sealed class PostgresFixture : IAsyncLifetime
     /// <summary>How long the container took to start, reported by the suite.</summary>
     public TimeSpan StartupDuration { get; private set; }
 
+    /// <summary>
+    /// A database of its own for the HTTP tests, left empty so the application's
+    /// own start-up migrates and seeds it.
+    /// </summary>
+    /// <remarks>
+    /// It cannot share the mapping tests' database. The seeder stops as soon as
+    /// any specialty exists, so a shared schema would leave the practice
+    /// unseeded and every sign-in test would fail for the wrong reason.
+    /// </remarks>
+    public string ApiConnectionString { get; private set; } = string.Empty;
+
     /// <summary>Starts the container and applies the migrations.</summary>
     public async Task InitializeAsync()
     {
@@ -34,6 +45,8 @@ public sealed class PostgresFixture : IAsyncLifetime
 
         await using var database = CreateContext();
         await database.Database.MigrateAsync();
+
+        ApiConnectionString = await CreateEmptyDatabaseAsync().ConfigureAwait(false);
 
         StartupDuration = DateTimeOffset.UtcNow - startedAt;
     }
@@ -48,6 +61,15 @@ public sealed class PostgresFixture : IAsyncLifetime
     /// </summary>
     public async Task<MediQueueDbContext> CreateIsolatedDatabaseAsync()
     {
+        var database = CreateContext(await CreateEmptyDatabaseAsync().ConfigureAwait(false));
+        await database.Database.MigrateAsync();
+
+        return database;
+    }
+
+    /// <summary>Creates an empty database in the container and returns its connection string.</summary>
+    public async Task<string> CreateEmptyDatabaseAsync()
+    {
         var databaseName = $"mq_{Guid.NewGuid():N}"[..20];
 
         await using (var admin = new NpgsqlConnection(_container.GetConnectionString()))
@@ -57,15 +79,10 @@ public sealed class PostgresFixture : IAsyncLifetime
             await create.ExecuteNonQueryAsync();
         }
 
-        var connectionString = new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
+        return new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
         {
             Database = databaseName,
         }.ConnectionString;
-
-        var database = CreateContext(connectionString);
-        await database.Database.MigrateAsync();
-
-        return database;
     }
 
     /// <summary>Opens a raw connection, for inserting rows the domain would refuse to create.</summary>
