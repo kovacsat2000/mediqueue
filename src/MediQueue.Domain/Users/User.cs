@@ -117,4 +117,22 @@ public sealed class User
             UserRole.Doctor,
             specialtyId,
             isActive: true);
+
+    /// <summary>
+    /// Takes the user out of service: they can no longer sign in, and a doctor
+    /// stops being offered new patients.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent, deliberately, and this is the one place it differs from a
+    /// visit's soft delete. A second soft delete would overwrite who deleted the
+    /// record first, which is real information and irrecoverable, so that one
+    /// throws. Deactivation stores no "who" and no "when", so a second call has
+    /// nothing to destroy — and refusing it would only make every caller check
+    /// the flag first.
+    /// </remarks>
+    public void Deactivate() => IsActive = false;
+
+    /// <summary>Puts the user back into service.</summary>
+    /// <remarks>Idempotent, for the same reason as <see cref="Deactivate"/>.</remarks>
+    public void Reactivate() => IsActive = true;
 }

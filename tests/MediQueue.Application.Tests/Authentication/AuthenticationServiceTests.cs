@@ -161,11 +161,7 @@ public class AuthenticationServiceTests
     private static User AnInactiveAssistant()
     {
         var user = AnAssistant();
-
-        // IsActive has a private setter and no factory sets it false yet, so the
-        // only honest way to build this case is the way EF Core will: through the
-        // property EF itself writes on materialisation.
-        typeof(User).GetProperty(nameof(User.IsActive))!.SetValue(user, false);
+        user.Deactivate();
 
         return user;
     }

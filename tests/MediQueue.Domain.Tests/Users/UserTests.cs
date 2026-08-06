@@ -59,4 +59,73 @@ public class UserTests
     {
         User.CreateAssistant("kovacs.anna", "Kovács Anna", "hash", Now).Id.Version.ShouldBe(7);
     }
+
+    [Fact]
+    public void A_user_starts_active()
+    {
+        User.CreateDoctor("nagy.peter", "Dr. Nagy Péter", "hash", SpecialtyId, Now).IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Deactivating_takes_the_user_out_of_service()
+    {
+        var doctor = User.CreateDoctor("nagy.peter", "Dr. Nagy Péter", "hash", SpecialtyId, Now);
+
+        doctor.Deactivate();
+
+        doctor.IsActive.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Deactivating_twice_is_a_no_op_rather_than_an_error()
+    {
+        // Unlike a second soft delete, which would overwrite who deleted a visit
+        // first, a second deactivation has no information to destroy.
+        var doctor = User.CreateDoctor("nagy.peter", "Dr. Nagy Péter", "hash", SpecialtyId, Now);
+        doctor.Deactivate();
+
+        Should.NotThrow(() => doctor.Deactivate());
+
+        doctor.IsActive.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Reactivating_puts_the_user_back_into_service()
+    {
+        var doctor = User.CreateDoctor("nagy.peter", "Dr. Nagy Péter", "hash", SpecialtyId, Now);
+        doctor.Deactivate();
+
+        doctor.Reactivate();
+
+        doctor.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Reactivating_twice_is_a_no_op_rather_than_an_error()
+    {
+        var doctor = User.CreateDoctor("nagy.peter", "Dr. Nagy Péter", "hash", SpecialtyId, Now);
+
+        Should.NotThrow(() => doctor.Reactivate());
+
+        doctor.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_deactivation_round_trip_leaves_everything_else_alone()
+    {
+        var doctor = User.CreateDoctor("nagy.peter", "Dr. Nagy Péter", "hash", SpecialtyId, Now);
+        var (id, username, fullName, passwordHash, role, specialtyId) =
+            (doctor.Id, doctor.Username, doctor.FullName, doctor.PasswordHash, doctor.Role, doctor.SpecialtyId);
+
+        doctor.Deactivate();
+        doctor.Reactivate();
+
+        doctor.Id.ShouldBe(id);
+        doctor.Username.ShouldBe(username);
+        doctor.FullName.ShouldBe(fullName);
+        doctor.PasswordHash.ShouldBe(passwordHash);
+        doctor.Role.ShouldBe(role);
+        doctor.SpecialtyId.ShouldBe(specialtyId);
+        doctor.IsActive.ShouldBeTrue();
+    }
 }
