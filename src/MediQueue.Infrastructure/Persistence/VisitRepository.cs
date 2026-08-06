@@ -42,5 +42,15 @@ public sealed class VisitRepository(MediQueueDbContext database) : IVisitReposit
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Visit>> GetUnassignedAsync(CancellationToken cancellationToken) =>
+        await database.Visits
+            .Where(visit => visit.Status == VisitStatus.Registered)
+            // Arrival order, because that is the order they should be dealt with
+            // and QueuedAt is null for all of them by definition.
+            .OrderBy(visit => visit.RegisteredAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public void Add(Visit visit) => database.Visits.Add(visit);
 }

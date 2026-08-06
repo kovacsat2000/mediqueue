@@ -33,6 +33,20 @@ public interface IVisitRepository
     /// <returns>The open visits.</returns>
     Task<IReadOnlyList<Visit>> GetAllOpenVisitsAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Visits that have arrived but have not been routed anywhere, oldest first.
+    /// </summary>
+    /// <remarks>
+    /// Every other listing groups by doctor, and a registered visit has none —
+    /// so without this, a patient registered without a specialty appeared in no
+    /// list at all and could only be reached by an identifier nobody had seen.
+    /// A state the specification names, which the system could enter and never
+    /// show, was not really implemented.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>Registered visits, in arrival order.</returns>
+    Task<IReadOnlyList<Visit>> GetUnassignedAsync(CancellationToken cancellationToken);
+
     /// <summary>Stages a new visit. Nothing is written until the unit of work commits.</summary>
     /// <param name="visit">The visit.</param>
     void Add(Visit visit);

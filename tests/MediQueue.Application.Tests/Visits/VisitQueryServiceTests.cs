@@ -107,6 +107,59 @@ public class VisitQueryServiceTests
     }
 
     [Fact]
+    public async Task A_visit_whose_patient_is_missing_fails_loudly_rather_than_rendering_blank()
+    {
+        // The batched lookup replaced a per-visit loop. A dictionary that
+        // silently yields nothing would produce rows with empty names, which
+        // looks like a data problem and hides a broken foreign key.
+        _fixture.SignedInAsAssistant();
+
+        var orphan = Visit.Register(Guid.CreateVersion7(VisitServiceFixture.Now), "Fejfájás", VisitServiceFixture.Now);
+        orphan.AssignToQueue(VisitServiceFixture.SpecialtyId, VisitServiceFixture.DoctorId,
+            VisitServiceFixture.Now.AddMinutes(1));
+
+        _fixture.Visits.GetAllOpenVisitsAsync(Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<Visit>>([orphan]);
+
+        var exception = await Should.ThrowAsync<NotFoundException>(
+            () => _fixture.Queues.GetAllQueuesAsync(default));
+
+        exception.Message.ShouldContain(orphan.PatientId.ToString());
+    }
+
+    [Fact]
+    public async Task The_projection_loads_every_patient_in_one_query()
+    {
+        _fixture.SignedInAsAssistant();
+
+        var first = _fixture.APatient("123-456-788", "Kis Elemér");
+        var second = _fixture.APatient("234-567-898", "Nagy Piroska");
+
+        IReadOnlyList<Visit> open =
+        [
+            AQueuedVisitFor(first),
+            AQueuedVisitFor(second),
+        ];
+        _fixture.Visits.GetAllOpenVisitsAsync(Arg.Any<CancellationToken>()).Returns(open);
+
+        await _fixture.Queues.GetAllQueuesAsync(default);
+
+        // One batched call, and never the per-visit lookup it replaced.
+        await _fixture.Patients.Received(1)
+            .GetByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>());
+        await _fixture.Patients.DidNotReceive().FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    private static Visit AQueuedVisitFor(MediQueue.Domain.Patients.Patient patient)
+    {
+        var visit = Visit.Register(patient.Id, "Fejfájás", VisitServiceFixture.Now);
+        visit.AssignToQueue(VisitServiceFixture.SpecialtyId, VisitServiceFixture.DoctorId,
+            VisitServiceFixture.Now.AddMinutes(1));
+
+        return visit;
+    }
+
+    [Fact]
     public async Task Every_active_doctor_appears_in_the_queue_list_even_with_nothing_waiting()
     {
         _fixture.SignedInAsAssistant();

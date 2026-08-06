@@ -62,6 +62,11 @@ public sealed class VisitServiceFixture
         Patients.FindByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => PatientsById.GetValueOrDefault(callInfo.Arg<Guid>()));
 
+        Patients.GetByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => (IReadOnlyDictionary<Guid, Patient>)(callInfo.Arg<IReadOnlyCollection<Guid>>() ?? [])
+                .Where(PatientsById.ContainsKey)
+                .ToDictionary(id => id, id => PatientsById[id]));
+
         // A repository that forgets what was just added to it is not behaving
         // like a repository, and every test built on it would be lying.
         Patients.When(repository => repository.Add(Arg.Any<Patient>()))

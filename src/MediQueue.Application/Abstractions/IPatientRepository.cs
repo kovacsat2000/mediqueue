@@ -24,6 +24,21 @@ public interface IPatientRepository
     /// <returns>The patient, or <c>null</c>.</returns>
     Task<Patient?> FindByIdAsync(Guid patientId, CancellationToken cancellationToken);
 
+    /// <summary>Loads many patients at once, keyed by identifier.</summary>
+    /// <remarks>
+    /// This is the price of the Patient/Visit split. A visit carries a patient
+    /// id and no navigation property — deliberately, so that holding a visit
+    /// does not hand you a mutable patient — so there is nothing to Include and
+    /// the obvious projection issues one query per visit. One batched query
+    /// pays that cost without undoing the aggregate boundary.
+    /// </remarks>
+    /// <param name="patientIds">The patients to load.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>Those that exist, keyed by identifier.</returns>
+    Task<IReadOnlyDictionary<Guid, Patient>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> patientIds,
+        CancellationToken cancellationToken);
+
     /// <summary>Stages a new patient. Nothing is written until the unit of work commits.</summary>
     /// <param name="patient">The patient.</param>
     void Add(Patient patient);

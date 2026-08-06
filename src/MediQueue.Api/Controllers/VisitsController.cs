@@ -13,7 +13,8 @@ public sealed class VisitsController(
     VisitRegistrationService registration,
     VisitAssignmentService assignment,
     VisitLifecycleService lifecycle,
-    VisitQueryService queries) : ControllerBase
+    VisitQueryService queries,
+    QueueQueryService queues) : ControllerBase
 {
     /// <summary>
     /// Names the read action for the Location header of a newly created visit.
@@ -155,13 +156,34 @@ public sealed class VisitsController(
         return NoContent();
     }
 
+    /// <summary>Lists visits that have arrived but have not been routed to anybody.</summary>
+    /// <remarks>
+    /// Every other listing groups by doctor, and these visits have none. Without
+    /// this endpoint a patient registered without a specialty is in no list at
+    /// all, reachable only by an identifier the assistant never saw.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>Registered visits, oldest arrival first.</returns>
+    /// <response code="200">The unrouted visits.</response>
+    [Authorize(Policy = AuthorizationPolicies.AssistantOnly)]
+    [HttpGet("unassigned")]
+    [ProducesResponseType<IReadOnlyList<VisitSummaryDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<VisitSummaryDto>>> GetUnassignedAsync(
+        CancellationToken cancellationToken) =>
+        Ok(await queues.GetUnassignedAsync(cancellationToken).ConfigureAwait(false));
+
     /// <summary>Reads one visit, projected for the caller's role.</summary>
     /// <remarks>
+    /// The <c>{id:guid}</c> constraint is load-bearing: without it this route
+    /// would swallow the literal <c>unassigned</c> segment above and answer 400
+    /// on a failed GUID parse.
+    /// <para>
     /// <strong>The response shape depends on who is asking.</strong> An assistant
     /// receives the summary projection, which has no diagnosis member at all. The
     /// doctor treating the visit receives the detail projection, which does.
     /// A doctor asking about a colleague's visit is refused rather than
     /// downgraded. The declared type below is the superset.
+    /// </para>
     /// </remarks>
     /// <param name="id">The visit.</param>
     /// <param name="cancellationToken">Cancels the request.</param>

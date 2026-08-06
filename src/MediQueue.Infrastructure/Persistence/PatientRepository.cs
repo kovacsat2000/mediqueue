@@ -19,5 +19,23 @@ public sealed class PatientRepository(MediQueueDbContext database) : IPatientRep
         database.Patients.SingleOrDefaultAsync(patient => patient.Id == patientId, cancellationToken);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<Guid, Patient>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> patientIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(patientIds);
+
+        if (patientIds.Count == 0)
+        {
+            return new Dictionary<Guid, Patient>();
+        }
+
+        return await database.Patients
+            .Where(patient => patientIds.Contains(patient.Id))
+            .ToDictionaryAsync(patient => patient.Id, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public void Add(Patient patient) => database.Patients.Add(patient);
 }

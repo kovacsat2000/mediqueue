@@ -55,6 +55,28 @@ public sealed class QueueQueryService(
         ];
     }
 
+    /// <summary>
+    /// Visits that have arrived but have not been routed to anybody.
+    /// </summary>
+    /// <remarks>
+    /// The one listing here that is not a queue: these visits are in nobody's.
+    /// It lives beside the queues because it needs exactly the same projection
+    /// machinery, and because from an assistant's seat it is the same screen —
+    /// the work that still has to be given to someone.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancels the queries.</param>
+    /// <returns>Registered visits, oldest arrival first.</returns>
+    public async Task<IReadOnlyList<VisitSummaryDto>> GetUnassignedAsync(CancellationToken cancellationToken)
+    {
+        var unassigned = await visits.GetUnassignedAsync(cancellationToken).ConfigureAwait(false);
+        var patientsById = await PatientsForAsync(unassigned, cancellationToken).ConfigureAwait(false);
+        var specialtyNames = await SpecialtyNamesAsync(cancellationToken).ConfigureAwait(false);
+        var doctorNames = (await doctors.GetActiveAsync(null, cancellationToken).ConfigureAwait(false))
+            .ToNameLookup();
+
+        return Project(unassigned, patientsById, specialtyNames, doctorNames);
+    }
+
     /// <summary>One doctor's queue.</summary>
     /// <param name="doctorId">Whose queue to read.</param>
     /// <param name="cancellationToken">Cancels the queries.</param>
@@ -107,20 +129,30 @@ public sealed class QueueQueryService(
         (await specialties.ListAsync(cancellationToken).ConfigureAwait(false))
             .ToDictionary(specialty => specialty.Id, specialty => specialty.Name);
 
+    /// <summary>
+    /// Loads every patient the projection needs, in one query.
+    /// </summary>
+    /// <remarks>
+    /// A visit holds a patient id and no navigation property, so there is
+    /// nothing to Include. One batched query is what that costs; the loop this
+    /// replaced issued one per open visit, on the assistant's main screen.
+    /// </remarks>
     private async Task<IReadOnlyDictionary<Guid, Patient>> PatientsForAsync(
         IEnumerable<Visit> queue,
         CancellationToken cancellationToken)
     {
-        var found = new Dictionary<Guid, Patient>();
+        var wanted = queue.Select(visit => visit.PatientId).Distinct().ToList();
 
-        foreach (var patientId in queue.Select(visit => visit.PatientId).Distinct())
+        var found = await patients.GetByIdsAsync(wanted, cancellationToken).ConfigureAwait(false);
+
+        // A visit whose patient is missing is a broken foreign key, not an empty
+        // name to render. Failing here is loud; rendering a blank row is not.
+        var missing = wanted.Where(id => !found.ContainsKey(id)).ToList();
+
+        if (missing.Count > 0)
         {
-            var patient = await patients.FindByIdAsync(patientId, cancellationToken).ConfigureAwait(false);
-
-            if (patient is not null)
-            {
-                found[patientId] = patient;
-            }
+            throw new NotFoundException(
+                $"{missing.Count} visit(s) reference a patient that does not exist: {string.Join(", ", missing)}.");
         }
 
         return found;
