@@ -94,6 +94,8 @@ Client.*      → Client.Core, Contracts             Avalonia desktop shells
 
 \* `Infrastructure` is referenced from `Api` **only** in the composition root (`Program.cs` and the `AddInfrastructure` / `AddMediQueueAuthentication` extensions). Controllers depend on Application interfaces, never on Infrastructure types and never on `DbContext`.
 
+`VisitContextLoader` exists so that four services do not each grow the same three lookups. Its boundary: it loads **display names** the DTOs carry and the entities do not. Anything that makes a decision stays in the service — do not let it accumulate business logic because it is convenient to reach.
+
 **The dependency rule is the point.** If you find yourself wanting to reference Infrastructure from Application, or EF Core from Domain, stop — introduce an interface in the inner layer and implement it in the outer one.
 
 **What `Application` may reference (D-39).** A package only if every type used from it is an interface or abstract type whose implementation is supplied at the composition root, implying no storage, no transport and no hosting model.
@@ -126,7 +128,9 @@ These come from the specification and from the decision log. Violating any of th
 13. **A soft-deleted `Visit` is frozen.** Every mutating method guards on it, and EF Core applies a global query filter as a second layer. Through the API the filter wins first, so a deleted visit is a **404**; the domain guard is defence in depth that the API never reaches.
 14. **JWT claims use the short names `sub`, `name`, `role`, `specialtyId`.** Never `ClaimTypes.*` — those constants *are* the WS-Federation URIs. `MapInboundClaims` stays `false` and `NameClaimType` / `RoleClaimType` stay set explicitly. Under the framework default, authorization keeps working while `ICurrentUser.UserId` silently becomes null (D-37).
 15. **The 500 response body is identical in every environment** — no exception type, no message, no stack trace, no `DeveloperExceptionPage`. Diagnosis is the `traceId` plus the structured log. Consequently **every query endpoint needs an integration test that actually executes its query**, because a query that only compiles fails in front of the user as an opaque 500 (D-42).
-16. **No `IQueryable` and no DTO on a repository interface.** Repositories and directories return domain entities; mapping to `Contracts` happens in `Application`, because the role-scoped DTOs are a security boundary (D-19, D-38). No `IRepository<T>`.
+16. **Persistence interfaces speak in value objects, not the primitives inside them.** `FindByTajAsync(TajNumber)`, never `FindByTajAsync(string)`. With a value converter EF sees one column of type `TajNumber`, so `p.Taj.Digits == taj` has no translation and fails at runtime as an opaque 500 (D-47). The better reason: the method then cannot be called with a string nobody validated.
+17. **Error messages disclose only what the caller can act on** (D-50). Wrong password and unknown username produce byte-identical 401 bodies. A 403 says the visit is not in your queue and never names the colleague who owns it. A 500 carries nothing. The test is: would the caller behave differently if told?
+18. **No `IQueryable` and no DTO on a repository interface.** Repositories and directories return domain entities; mapping to `Contracts` happens in `Application`, because the role-scoped DTOs are a security boundary (D-19, D-38). No `IRepository<T>`.
 
 ---
 
@@ -136,6 +140,7 @@ These come from the specification and from the decision log. Violating any of th
 - **`Microsoft.OpenApi` is pinned forward to 2.7.5** to close a high-severity advisory that the transitive 2.0.0 carries. Do not relax the pin. Never suppress `NU1903`.
 - **`.gitattributes` forces `eol=lf`.** The Avalonia templates emit CRLF; without this the history alternates.
 - **`global.json` sets `allowPrerelease: false`.** Outside Visual Studio this defaults to true, which would silently select a preview SDK.
+- **Outside Development, `/openapi/v1.json` answers 401, not 404.** The routes are not mapped, but the `FallbackPolicy` applies to requests matching no endpoint at all. That is deliberate and asserted — do not "fix" it to a 404 (D-40).
 - **`app.UseHttpsRedirection()` applies outside Development only.** Under the http launch profile it logs a warning on every request, which pollutes the demo.
 - **The EF Core family is pinned as a unit** (D-35). Npgsql declares a lower EF Core version than `Design` resolves, and `PrivateAssets="all"` stops the higher one flowing onward — so two projects silently compile against different versions. Do not unpin.
 - **`Microsoft.EntityFrameworkCore.Design` is referenced from both Infrastructure and Api**, both `PrivateAssets="all"`. `dotnet ef` resolves the `DbContext` through the *startup* project's DI, so it needs it in Api too.
@@ -143,6 +148,7 @@ These come from the specification and from the decision log. Violating any of th
 - **The `xmin` concurrency token is a shadow property**, not a field on `Visit`. The generated migration declares an `xmin` column that Npgsql's SQL generator deliberately never emits — that is correct, not a bug to fix.
 - **`EnforceCodeStyleInBuild` is effectively decorative** as configured: IDE analyzers default to *silent*, and raising their severity makes the stock templates fail to compile. `dotnet format` is the real gate. Do not raise IDE severities without a decision from the controller session.
 - **`public partial class Program` at the end of `Program.cs`** exists so `WebApplicationFactory<Program>` can find an entry point; top-level statements generate an internal one. Do not remove it, and do not replace it with `InternalsVisibleTo` — a production assembly should not name a test assembly.
+- **Never use `nameof(SomethingAsync)` to name a route.** MVC strips the `Async` suffix from action names by convention, so `CreatedAtAction(nameof(GetAsync), …)` names a route that does not exist and throws at runtime, *after* the transaction has committed. Use a named route constant. Outside Development this surfaces as a 409 on the client's retry rather than as the 500 it is (D-48).
 - **Four endpoints carry `[AllowAnonymous]`:** `POST /api/auth/login`, `GET /health`, `/openapi/v1.json` and `/scalar`. The last two are mapped in Development only; without the attribute the reference UI loads and renders nothing (D-40).
 
 ---
@@ -160,7 +166,7 @@ These come from the specification and from the decision log. Violating any of th
 - **Mutation testing is expected in every phase report**, not optional. For each new rule, state which mutant your tests actually kill and how many fail. A test that survives its mutant is not a test — and if a mutant fails the whole suite for a structural reason rather than an assertion, say so instead of claiming the number.
 - **A negative test must be shown to fail for the stated reason, not merely to fail** (D-45). Choose the endpoint or fixture with the fewest other preconditions, so the asserted status can only come from the rule under test. Two P3 expiry tests asserted 401 and were green while asserting nothing, because the 401 came from "user not found" rather than from the expiry.
 - **A test that needs reflection to build a fixture is reporting a modelling gap.** Add the behaviour to the domain rather than reaching around it.
-- Persistence tests share one container. Tests needing an empty schema get their own migrated database; the rest isolate with unique TAJs and usernames. Note that a GUID suffix does not work as an isolation token — `PatientName` rejects digits.
+- Persistence tests share one container. Tests needing an empty schema get their own migrated database; the rest isolate with unique TAJs and usernames. Note that a GUID suffix does not work as an isolation token — `PatientName` rejects digits; unique names map GUID characters into the letter range and TAJ numbers come from a counter. **Those generated TAJ numbers are well-formed but not necessarily checksum-valid**, so any test that switches `Validation:TajChecksumEnabled` on must generate valid ones itself.
 - Lifecycle tests **create their own data through the API** rather than mutating seeded rows, so no test depends on seed state or on another test's order.
 
 ---
