@@ -68,6 +68,17 @@ public sealed class TestOnlyController : ControllerBase
         return Ok();
     }
 
+    /// <summary>Throws the error EF Core raises when a row changed underneath us.</summary>
+    /// <remarks>
+    /// The concurrency mapping has no production endpoint that can reach it
+    /// deterministically: provoking a real xmin conflict through HTTP would need
+    /// two interleaved requests. The persistence suite proves the token itself
+    /// works against a real database; this proves the status it turns into.
+    /// </remarks>
+    [HttpGet("concurrency-conflict")]
+    public IActionResult ConcurrencyConflict() =>
+        throw new Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException("Row was modified.");
+
     /// <summary>Throws a field-level validation error.</summary>
     [HttpGet("validation-failure")]
     public IActionResult ValidationFailure() =>

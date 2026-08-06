@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace MediQueue.Api.IntegrationTests.Api;
@@ -38,7 +39,25 @@ public sealed class MediQueueApiFactory(PostgresFixture postgres) : WebApplicati
             services
                 .AddControllers()
                 .AddApplicationPart(typeof(TestOnlyController).Assembly);
+
+            if (_clock is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(_clock);
+            }
         });
+    }
+
+    private TimeProvider? _clock;
+
+    /// <summary>Substitutes the clock the whole application reads.</summary>
+    /// <param name="clock">The clock, usually a <c>FakeTimeProvider</c>.</param>
+    /// <returns>This factory, for chaining.</returns>
+    public MediQueueApiFactory WithClock(TimeProvider clock)
+    {
+        _clock = clock;
+
+        return this;
     }
 
     /// <summary>Applies migrations and seeds, then hands back a client.</summary>
