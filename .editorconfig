@@ -70,3 +70,39 @@ dotnet_naming_symbols.private_field_symbols.applicable_kinds = field
 dotnet_naming_symbols.private_field_symbols.applicable_accessibilities = private
 dotnet_naming_style.prefix_underscore_camel.required_prefix = _
 dotnet_naming_style.prefix_underscore_camel.capitalization = camel_case
+
+# --- Avalonia XAML diagnostics --------------------------------------------
+# TreatWarningsAsErrors does not reach the XAML compiler: it runs as an MSBuild
+# task, not as a Roslyn analyzer, so a deprecation surfaced as AVLN5001 and the
+# build stayed green. The XAML compiler reads .editorconfig itself — the task is
+# passed @(EditorConfigFiles) — but under its own key, not dotnet_diagnostic:
+#
+#     avalonia_xaml_diagnostic.<CODE>.severity = error|warning
+#
+# There is no wildcard, so the list below is every AVLN code Avalonia 12.1.1
+# defines, promoted as a set. Enumerating them is the cost of closing the gap;
+# a new code in a future Avalonia would default back to its own severity, which
+# is the one thing to re-check on an upgrade.
+[*.axaml]
+avalonia_xaml_diagnostic.AVLN1000.severity = error
+avalonia_xaml_diagnostic.AVLN1001.severity = error
+avalonia_xaml_diagnostic.AVLN2000.severity = error
+avalonia_xaml_diagnostic.AVLN2002.severity = error
+avalonia_xaml_diagnostic.AVLN2003.severity = error
+avalonia_xaml_diagnostic.AVLN2005.severity = error
+avalonia_xaml_diagnostic.AVLN2100.severity = error
+avalonia_xaml_diagnostic.AVLN2101.severity = error
+avalonia_xaml_diagnostic.AVLN2200.severity = error
+avalonia_xaml_diagnostic.AVLN2201.severity = error
+avalonia_xaml_diagnostic.AVLN2202.severity = error
+avalonia_xaml_diagnostic.AVLN2203.severity = error
+avalonia_xaml_diagnostic.AVLN2204.severity = error
+avalonia_xaml_diagnostic.AVLN2205.severity = error
+avalonia_xaml_diagnostic.AVLN2206.severity = error
+avalonia_xaml_diagnostic.AVLN2207.severity = error
+avalonia_xaml_diagnostic.AVLN2208.severity = error
+avalonia_xaml_diagnostic.AVLN3000.severity = error
+avalonia_xaml_diagnostic.AVLN3001.severity = error
+avalonia_xaml_diagnostic.AVLN4001.severity = error
+avalonia_xaml_diagnostic.AVLN5001.severity = error
+avalonia_xaml_diagnostic.AVLN9999.severity = error
