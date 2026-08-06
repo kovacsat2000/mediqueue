@@ -1,3 +1,4 @@
+using MediQueue.Application.Auditing;
 using MediQueue.Application.Authentication;
 using MediQueue.Application.Visits;
 using MediQueue.Domain.Scheduling;
@@ -31,6 +32,7 @@ public static class ApplicationServices
         services.AddScoped<VisitLifecycleService>();
         services.AddScoped<VisitQueryService>();
         services.AddScoped<QueueQueryService>();
+        services.AddScoped<AuditQueryService>();
 
         // The one genuinely algorithmic rule in the assignment, named and
         // swappable: an alternative policy is a change to this line.

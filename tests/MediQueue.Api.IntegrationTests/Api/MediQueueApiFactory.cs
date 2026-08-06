@@ -20,6 +20,27 @@ namespace MediQueue.Api.IntegrationTests.Api;
 /// </remarks>
 public sealed class MediQueueApiFactory(PostgresFixture postgres) : WebApplicationFactory<Program>
 {
+    private string? _connectionString;
+
+    /// <summary>
+    /// Points this application at a database of its own.
+    /// </summary>
+    /// <remarks>
+    /// The shared one accumulates whatever the other HTTP tests wrote, which is
+    /// fine for tests that create their own data and assert on it. It is not
+    /// fine for a test whose subject is what the application wrote <em>on its
+    /// own</em> — "the seeder produced no audit entries" can only be asked of a
+    /// database nothing else has touched.
+    /// </remarks>
+    /// <param name="connectionString">An empty database from the fixture.</param>
+    /// <returns>This factory, for chaining.</returns>
+    public MediQueueApiFactory WithOwnDatabase(string connectionString)
+    {
+        _connectionString = connectionString;
+
+        return this;
+    }
+
     /// <inheritdoc />
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -29,7 +50,7 @@ public sealed class MediQueueApiFactory(PostgresFixture postgres) : WebApplicati
         // sign in as the seeded accounts.
         builder.UseEnvironment(Environments.Development);
 
-        builder.UseSetting("ConnectionStrings:Default", postgres.ApiConnectionString);
+        builder.UseSetting("ConnectionStrings:Default", _connectionString ?? postgres.ApiConnectionString);
 
         builder.ConfigureServices(services =>
         {

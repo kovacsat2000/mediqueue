@@ -75,6 +75,9 @@ public static class DependencyInjection
         services.AddScoped<IVisitRepository, VisitRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        // Read-only: the trail is written by the interceptor, never by a caller.
+        services.AddScoped<IAuditRepository, AuditRepository>();
+
         services.AddMediQueueAuthentication(configuration);
 
         return services;
