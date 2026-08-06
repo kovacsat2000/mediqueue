@@ -68,7 +68,11 @@ public sealed class DatabaseSeeder(
         var internalMedicine = Specialty.Create("Belgyógyászat", opening);
         var dermatology = Specialty.Create("Bőrgyógyászat", opening);
         var ophthalmology = Specialty.Create("Szemészet", opening);
-        database.Specialties.AddRange(internalMedicine, dermatology, ophthalmology);
+        // Rheumatology exists so that one specialty has no doctor available.
+        // Without it, every rule about active doctors is unprovable: assignment
+        // always succeeds, and deleting the IsActive filter fails nothing.
+        var rheumatology = Specialty.Create("Reumatológia", opening);
+        database.Specialties.AddRange(internalMedicine, dermatology, ophthalmology, rheumatology);
 
         // Two doctors share internal medicine, so the assignment strategy has a
         // visible choice to make during the demo rather than a foregone one.
@@ -77,6 +81,14 @@ public sealed class DatabaseSeeder(
         var szabo = Doctor("szabo.maria", "Dr. Szabó Mária", dermatology.Id);
         var toth = Doctor("toth.gabor", "Dr. Tóth Gábor", ophthalmology.Id);
         database.Users.AddRange(kovacs, nagy, szabo, toth);
+
+        // The practice's rheumatologist has left. They are the only doctor in
+        // that specialty, so routing a patient there has nowhere to go — which
+        // is the D-09 edge case, and a beat in the demo where the system holds
+        // instead of succeeding again.
+        var farkas = Doctor("farkas.judit", "Dr. Farkas Judit", rheumatology.Id);
+        farkas.Deactivate();
+        database.Users.Add(farkas);
 
         database.Users.AddRange(
             Assistant("horvath.anna", "Horváth Anna"),
@@ -117,9 +129,11 @@ public sealed class DatabaseSeeder(
         await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation(
-            "Seeded the development database: {Specialties} specialties, {Users} users, {Patients} patients, {Visits} visits.",
-            3,
-            6,
+            "Seeded the development database: {Specialties} specialties, {Users} users "
+            + "({InactiveUsers} inactive), {Patients} patients, {Visits} visits.",
+            4,
+            7,
+            1,
             6,
             6);
     }

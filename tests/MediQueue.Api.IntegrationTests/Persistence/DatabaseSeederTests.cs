@@ -32,18 +32,29 @@ public class DatabaseSeederTests(PostgresFixture postgres)
 
         await SeederFor(database).SeedAsync();
 
-        (await database.Specialties.CountAsync()).ShouldBe(3);
-        (await database.Users.CountAsync()).ShouldBe(6);
+        (await database.Specialties.CountAsync()).ShouldBe(4);
+        (await database.Users.CountAsync()).ShouldBe(7);
         (await database.Patients.CountAsync()).ShouldBe(6);
         (await database.Visits.CountAsync()).ShouldBe(6);
 
-        (await database.Users.CountAsync(user => user.Role == UserRole.Doctor)).ShouldBe(4);
+        (await database.Users.CountAsync(user => user.Role == UserRole.Doctor)).ShouldBe(5);
+        (await database.Users.CountAsync(user => user.Role == UserRole.Doctor && user.IsActive)).ShouldBe(4);
+
+        // Exactly one specialty has no active doctor, which is what makes the
+        // "nobody available" path reachable at all.
+        var specialtiesWithNoActiveDoctor = await database.Specialties
+            .Where(specialty => !database.Users.Any(user =>
+                user.SpecialtyId == specialty.Id && user.Role == UserRole.Doctor && user.IsActive))
+            .Select(specialty => specialty.Name)
+            .ToListAsync();
+
+        specialtiesWithNoActiveDoctor.ShouldBe(["Reumatológia"]);
         (await database.Users.CountAsync(user => user.Role == UserRole.Assistant)).ShouldBe(2);
 
         // At least two doctors must share a specialty, or the assignment strategy
         // has nothing to choose between during the demo.
         var doctorsPerSpecialty = await database.Users
-            .Where(user => user.Role == UserRole.Doctor)
+            .Where(user => user.Role == UserRole.Doctor && user.IsActive)
             .GroupBy(user => user.SpecialtyId)
             .Select(group => group.Count())
             .ToListAsync();

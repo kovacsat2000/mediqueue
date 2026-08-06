@@ -42,7 +42,7 @@ public class DirectoryEndpointTests(PostgresFixture postgres) : IAsyncLifetime
 
         specialties.ShouldNotBeNull();
         specialties.Select(specialty => specialty.Name)
-            .ShouldBe(["Belgyógyászat", "Bőrgyógyászat", "Szemészet"]);
+            .ShouldBe(["Belgyógyászat", "Bőrgyógyászat", "Reumatológia", "Szemészet"]);
     }
 
     [Fact]
@@ -51,7 +51,12 @@ public class DirectoryEndpointTests(PostgresFixture postgres) : IAsyncLifetime
         var doctors = await _client.GetFromJsonAsync<List<DoctorDto>>("/api/doctors");
 
         doctors.ShouldNotBeNull();
+
+        // Five doctors are seeded and one is deactivated. Before the inactive
+        // one existed this count was 4 for no reason — every seeded doctor was
+        // active, so deleting the IsActive filter failed nothing.
         doctors.Count.ShouldBe(4);
+        doctors.ShouldNotContain(doctor => doctor.FullName == "Dr. Farkas Judit");
 
         // The specialty name travels with the doctor, so a client rendering the
         // list needs no second call and no join of its own.
