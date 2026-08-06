@@ -1,6 +1,11 @@
+using MediQueue.Application.Abstractions;
+using MediQueue.Infrastructure.Auditing;
 using MediQueue.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using NSubstitute;
 using Testcontainers.PostgreSql;
 
 namespace MediQueue.Api.IntegrationTests.Persistence;
@@ -62,6 +67,49 @@ public sealed class PostgresFixture : IAsyncLifetime
     public async Task<MediQueueDbContext> CreateIsolatedDatabaseAsync()
     {
         var database = CreateContext(await CreateEmptyDatabaseAsync().ConfigureAwait(false));
+        await database.Database.MigrateAsync();
+
+        return database;
+    }
+
+    /// <summary>
+    /// A context over its own empty database with the audit interceptor wired,
+    /// and with the actor and the clock under the test's control.
+    /// </summary>
+    /// <remarks>
+    /// The other factories deliberately leave the interceptor out, so the
+    /// mapping tests observe rows without an audit trail forming behind them.
+    /// This one exists for the tests whose subject <em>is</em> the interceptor:
+    /// it is the only way to drive a missing actor, or a second save after a
+    /// failed one, without an HTTP request in the way.
+    /// </remarks>
+    /// <param name="actor">Who the interceptor should record, or <c>null</c> for none.</param>
+    /// <param name="suppression">The opt-out, so a test can seed without auditing.</param>
+    /// <param name="clock">The clock the entries are stamped from.</param>
+    /// <param name="logger">Supplied when a test asserts on what was logged.</param>
+    /// <returns>The migrated, auditing context.</returns>
+    public async Task<MediQueueDbContext> CreateAuditedDatabaseAsync(
+        Guid? actor,
+        AuditSuppression? suppression = null,
+        TimeProvider? clock = null,
+        ILogger<AuditSaveChangesInterceptor>? logger = null)
+    {
+        var currentUser = Substitute.For<ICurrentUser>();
+        currentUser.UserId.Returns(actor);
+        currentUser.IsAuthenticated.Returns(actor is not null);
+
+        var interceptor = new AuditSaveChangesInterceptor(
+            currentUser,
+            suppression ?? new AuditSuppression(),
+            clock ?? TimeProvider.System,
+            logger ?? NullLogger<AuditSaveChangesInterceptor>.Instance);
+
+        var database = new MediQueueDbContext(
+            new DbContextOptionsBuilder<MediQueueDbContext>()
+                .UseNpgsql(await CreateEmptyDatabaseAsync().ConfigureAwait(false))
+                .AddInterceptors(interceptor)
+                .Options);
+
         await database.Database.MigrateAsync();
 
         return database;

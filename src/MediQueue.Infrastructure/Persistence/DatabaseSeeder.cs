@@ -2,6 +2,7 @@ using MediQueue.Domain.Patients;
 using MediQueue.Domain.Specialties;
 using MediQueue.Domain.Users;
 using MediQueue.Domain.Visits;
+using MediQueue.Infrastructure.Auditing;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -27,6 +28,7 @@ namespace MediQueue.Infrastructure.Persistence;
 public sealed class DatabaseSeeder(
     MediQueueDbContext database,
     IPasswordHasher<User> passwordHasher,
+    AuditSuppression auditSuppression,
     TimeProvider timeProvider,
     ILogger<DatabaseSeeder> logger)
 {
@@ -126,7 +128,15 @@ public sealed class DatabaseSeeder(
         database.Patients.AddRange(erzsebet, varga, balogh, molnar, fekete, simon);
         database.Visits.AddRange(registered, waitingForKovacs, waitingForNagy, inTreatment, completed, secondForToth);
 
-        await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        // Seed rows are fixture, not business events: nobody registered Tóth
+        // Erzsébet, she was compiled in. Suppression is asked for explicitly
+        // rather than inferred from the absence of a signed-in user — that
+        // inference is the dangerous shape, because it would silently empty the
+        // audit log the day the identity pipeline broke.
+        using (auditSuppression.Suppress())
+        {
+            await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         logger.LogInformation(
             "Seeded the development database: {Specialties} specialties, {Users} users "

@@ -1,5 +1,6 @@
 using MediQueue.Domain.Users;
 using MediQueue.Domain.Visits;
+using MediQueue.Infrastructure.Auditing;
 using MediQueue.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ public class DatabaseSeederTests(PostgresFixture postgres)
         new(
             database,
             new PasswordHasher<User>(),
+            new AuditSuppression(),
             new FakeTimeProvider(SeedTime),
             NullLogger<DatabaseSeeder>.Instance);
 

@@ -1,3 +1,4 @@
+using MediQueue.Domain.Auditing;
 using MediQueue.Domain.Patients;
 using MediQueue.Domain.Specialties;
 using MediQueue.Domain.Users;
@@ -30,6 +31,12 @@ public sealed class MediQueueDbContext(DbContextOptions<MediQueueDbContext> opti
 
     /// <summary>Episodes of care. Soft-deleted rows are filtered out by default.</summary>
     public DbSet<Visit> Visits => Set<Visit>();
+
+    /// <summary>
+    /// Every data modification, written by the interceptor rather than by any
+    /// use case.
+    /// </summary>
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

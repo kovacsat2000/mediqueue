@@ -1,5 +1,6 @@
 using MediQueue.Application.Abstractions;
 using MediQueue.Domain.Users;
+using MediQueue.Infrastructure.Auditing;
 using MediQueue.Infrastructure.Authentication;
 using MediQueue.Infrastructure.Directory;
 using MediQueue.Infrastructure.Persistence;
@@ -32,7 +33,17 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 "Connection string 'Default' is not configured. See appsettings.Development.json.");
 
-        services.AddDbContext<MediQueueDbContext>(options => options.UseNpgsql(connectionString));
+        // The audit interceptor is scoped, because the actor it records comes
+        // from the scoped ICurrentUser. Resolving it from the DbContext factory
+        // is what lets a SaveChangesInterceptor see who is making the request —
+        // the alternative, a singleton reading an ambient accessor, is the same
+        // thing with the lifetime bug still to be discovered.
+        services.AddScoped<AuditSuppression>();
+        services.AddScoped<AuditSaveChangesInterceptor>();
+
+        services.AddDbContext<MediQueueDbContext>((serviceProvider, options) => options
+            .UseNpgsql(connectionString)
+            .AddInterceptors(serviceProvider.GetRequiredService<AuditSaveChangesInterceptor>()));
 
         // The clock, everywhere outside Domain. TimeProvider is built into the
         // framework and has a first-party fake, so tests substitute it without a
