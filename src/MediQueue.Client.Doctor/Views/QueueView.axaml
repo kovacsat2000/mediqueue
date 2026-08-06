@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MediQueue.Client.Core.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="520"
+             x:Class="MediQueue.Client.Doctor.Views.QueueView"
+             x:DataType="vm:QueueViewModel">
+
+  <!--
+    An ItemsControl rather than a DataGrid: DataGrid lives in a separate
+    Avalonia package and needs its own theme include, which is more machinery
+    than a four-column read-only list is worth.
+  -->
+  <DockPanel Margin="24">
+
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
+      <TextBlock Text="{Binding DoctorName}" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock Text="Waiting list, in arrival order." Opacity="0.7" />
+    </StackPanel>
+
+    <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0" Spacing="8">
+      <Button Content="Refresh"
+              Command="{Binding RefreshCommand}"
+              IsEnabled="{Binding !IsBusy}"
+              HorizontalAlignment="Left" />
+      <TextBlock Text="Loading…" IsVisible="{Binding IsBusy}" Opacity="0.7" />
+      <TextBlock Text="{Binding ErrorMessage}"
+                 IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                 Foreground="#B3261E"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Grid RowDefinitions="Auto,*">
+
+      <Grid Grid.Row="0" ColumnDefinitions="80,*,140,110" Margin="0,0,0,6">
+        <TextBlock Grid.Column="0" Text="Time" FontWeight="SemiBold" Opacity="0.7" />
+        <TextBlock Grid.Column="1" Text="Patient" FontWeight="SemiBold" Opacity="0.7" />
+        <TextBlock Grid.Column="2" Text="TAJ" FontWeight="SemiBold" Opacity="0.7" />
+        <TextBlock Grid.Column="3" Text="Status" FontWeight="SemiBold" Opacity="0.7" />
+      </Grid>
+
+      <Grid Grid.Row="1">
+        <!-- An empty queue says so, rather than showing a blank rectangle that
+             looks like a failure. -->
+        <TextBlock Text="Nobody is waiting."
+                   IsVisible="{Binding IsEmpty}"
+                   Opacity="0.6"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+
+        <ScrollViewer IsVisible="{Binding !IsEmpty}">
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:QueueRow">
+                <Border BorderBrush="#22000000" BorderThickness="0,0,0,1" Padding="0,8">
+                  <Grid ColumnDefinitions="80,*,140,110">
+                    <TextBlock Grid.Column="0" Text="{Binding QueuedAtDisplay}" FontFamily="monospace" />
+                    <TextBlock Grid.Column="1" Text="{Binding PatientFullName}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="{Binding Taj}" FontFamily="monospace" />
+                    <TextBlock Grid.Column="3" Text="{Binding Status}" Opacity="0.8" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
+
+    </Grid>
+
+  </DockPanel>
+
+</UserControl>
