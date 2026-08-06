@@ -62,6 +62,58 @@ With the API running in Development:
 Stop the database with `docker compose down`, or `docker compose down -v` to
 discard the volume and start from a clean database.
 
+## The audit trail, and the one guarantee that is not structural
+
+Every data modification is recorded — who, when, which record, and each field
+that moved, from what to what. The capture happens in an EF Core
+`SaveChangesInterceptor` rather than in each use case, **because a use case can
+forget and this one must not**: a new use case is audited because it saves, and
+a new entity is audited because it is not one of the two audit types themselves.
+The entries are written in the same transaction as the change they describe.
+
+The log is queryable at `GET /api/audit`, filterable by patient, by user and by
+date, and it deliberately ignores the soft-delete filter — a deleted visit's
+history is the history most worth having.
+
+That creates the problem this section exists to name. The specification requires
+an audit log that says what changed *and* forbids assistants from seeing
+diagnoses. Together those hand the assistant the diagnosis through the back
+door. So sensitive values are replaced with `***` for anyone who is not a
+doctor, and the field change carries `redacted: true` so a client can render
+"hidden" rather than three asterisks as though they were the data.
+
+**This is the only security rule in the system enforced by a runtime branch
+rather than by a type.** Everywhere else the guarantee is structural: an
+assistant receives `VisitSummaryDto`, which declares no diagnosis member, so the
+leak is not merely forbidden but unwriteable. That mechanism cannot reach here —
+a doctor and an assistant read the *same* audit entry, and the same field must
+be present for one and withheld from the other. No shape of type decides that.
+
+What compensates, stated plainly because a reviewer is entitled to check it:
+
+1. **The branch is written once**, in `AuditMapper.Reveal`. If redaction
+   appeared in two methods, one of them would eventually be edited and the other
+   would not.
+2. **It is pinned by tests that read the raw JSON**, not a deserialised object —
+   deserialising into `AuditFieldChangeDto` would discard the very field that
+   leaked and pass cheerfully against a broken server. One of those tests sweeps
+   every page of a multi-page response, because a leak on page three is still a
+   leak.
+3. **It fails closed.** The rule is written as "only a doctor may see this",
+   not "an assistant may not", so an unrecognised or absent role is redacted
+   until somebody decides otherwise.
+
+Doctors do see the values. The specification's role split is about *assistants*
+not seeing diagnoses, and clinical staff reading a patient's history is what a
+medical record is for.
+
+Two smaller decisions that follow from the same reasoning: seed rows are written
+with auditing explicitly suppressed, because fixture is not history and a log
+whose first two dozen entries have no actor teaches the reader that "no actor"
+is normal — and a change whose actor genuinely cannot be determined is recorded
+anyway, with a warning, because an anonymous entry is worth far more than a
+missing one.
+
 ## Solution layout
 
 ```
