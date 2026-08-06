@@ -96,7 +96,7 @@ public sealed class VisitServiceFixture
 
     public VisitQueryService Query => new(Visits, Context, CurrentUser);
 
-    public QueueQueryService Queues => new(Visits, Patients, Doctors, Specialties, CurrentUser);
+    public QueueQueryService Queues => new(Visits, Doctors, Context, CurrentUser);
 
     public static User TheDoctor() => Rehydrate(
         User.CreateDoctor("nagy.peter", "Dr. Nagy Péter", "hash", SpecialtyId, Now), DoctorId);

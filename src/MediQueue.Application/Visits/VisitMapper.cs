@@ -56,6 +56,35 @@ public static class VisitMapper
             visit.CompletedAt);
     }
 
+    /// <summary>Projects many visits for an assistant, in the order given.</summary>
+    /// <remarks>
+    /// The batch form exists because both listing services need exactly this and
+    /// a second copy of it would be a second place for the summary projection to
+    /// drift from the type that guarantees it.
+    /// </remarks>
+    /// <param name="visits">The visits, already in the order to display.</param>
+    /// <param name="patientsById">Their patients, keyed by identifier.</param>
+    /// <param name="specialtyNames">Specialty names, keyed by identifier.</param>
+    /// <param name="doctorNames">Doctor names, keyed by identifier.</param>
+    /// <returns>The summary projections.</returns>
+    public static IReadOnlyList<VisitSummaryDto> ToSummaries(
+        this IEnumerable<DomainVisit> visits,
+        IReadOnlyDictionary<Guid, Patient> patientsById,
+        IReadOnlyDictionary<Guid, string> specialtyNames,
+        IReadOnlyDictionary<Guid, string> doctorNames)
+    {
+        ArgumentNullException.ThrowIfNull(visits);
+        ArgumentNullException.ThrowIfNull(patientsById);
+
+        return
+        [
+            .. visits.Select(visit => visit.ToSummary(
+                patientsById[visit.PatientId],
+                specialtyNames.NameOf(visit.SpecialtyId),
+                doctorNames.NameOf(visit.DoctorId))),
+        ];
+    }
+
     /// <summary>Projects a visit for the doctor treating it.</summary>
     /// <param name="visit">The visit.</param>
     /// <param name="patient">Its patient.</param>

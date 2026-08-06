@@ -81,6 +81,48 @@ public sealed class VisitContextLoader(
         (await SpecialtyNamesAsync(cancellationToken).ConfigureAwait(false),
          (await doctors.GetActiveAsync(null, cancellationToken).ConfigureAwait(false)).ToNameLookup());
 
+    /// <summary>
+    /// Loads every patient a set of visits needs, in one query.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the plural of what <see cref="LoadAsync"/> does for a single
+    /// visit, including its reaction to a patient that is not there. A visit
+    /// holds a patient id and no navigation property, so there is nothing to
+    /// <c>Include</c>; one batched query is what that costs, and the loop it
+    /// replaced issued one per open visit on the assistant's main screen.
+    /// </para>
+    /// <para>
+    /// A missing patient is a broken foreign key, not an empty name to render.
+    /// Failing here is loud; a blank row looks like a data-entry problem and
+    /// hides the defect.
+    /// </para>
+    /// </remarks>
+    /// <param name="visits">The visits to be projected.</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>The patients, keyed by identifier.</returns>
+    /// <exception cref="NotFoundException">A visit references a patient that does not exist.</exception>
+    public async Task<IReadOnlyDictionary<Guid, Patient>> LoadPatientsAsync(
+        IEnumerable<Visit> visits,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(visits);
+
+        var wanted = visits.Select(visit => visit.PatientId).Distinct().ToList();
+
+        var found = await patients.GetByIdsAsync(wanted, cancellationToken).ConfigureAwait(false);
+
+        var missing = wanted.Where(id => !found.ContainsKey(id)).ToList();
+
+        if (missing.Count > 0)
+        {
+            throw new NotFoundException(
+                $"{missing.Count} visit(s) reference a patient that does not exist: {string.Join(", ", missing)}.");
+        }
+
+        return found;
+    }
+
     private async Task<IReadOnlyDictionary<Guid, string>> SpecialtyNamesAsync(CancellationToken cancellationToken) =>
         (await specialties.ListAsync(cancellationToken).ConfigureAwait(false))
             .ToDictionary(specialty => specialty.Id, specialty => specialty.Name);

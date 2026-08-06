@@ -58,6 +58,50 @@ public class VisitQueryServiceTests
     }
 
     [Fact]
+    public async Task The_unrouted_list_projects_visits_that_are_in_no_queue()
+    {
+        // It reads visits, not queues, which is why it lives here. The projection
+        // is the summary type: this is an assistant-facing listing.
+        _fixture.SignedInAsAssistant();
+
+        var patient = _fixture.APatient("123-456-788", "Kis Elemér");
+        var unrouted = Visit.Register(patient.Id, "Fejfájás", VisitServiceFixture.Now);
+
+        _fixture.Visits.GetUnassignedAsync(Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<Visit>>([unrouted]);
+
+        var result = await _fixture.Query.GetUnassignedAsync(default);
+
+        var only = result.ShouldHaveSingleItem();
+        only.Id.ShouldBe(unrouted.Id);
+        only.PatientFullName.ShouldBe("Kis Elemér");
+
+        // In nobody's queue is the whole point of the list.
+        only.DoctorId.ShouldBeNull();
+        only.SpecialtyId.ShouldBeNull();
+        only.QueuedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task An_unrouted_visit_whose_patient_is_missing_fails_loudly_too()
+    {
+        // The same guard as the queue projection, because it is now the same
+        // batched loader rather than a second copy of one.
+        _fixture.SignedInAsAssistant();
+
+        var orphan = Visit.Register(
+            Guid.CreateVersion7(VisitServiceFixture.Now), "Fejfájás", VisitServiceFixture.Now);
+
+        _fixture.Visits.GetUnassignedAsync(Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<Visit>>([orphan]);
+
+        var exception = await Should.ThrowAsync<NotFoundException>(
+            () => _fixture.Query.GetUnassignedAsync(default));
+
+        exception.Message.ShouldContain(orphan.PatientId.ToString());
+    }
+
+    [Fact]
     public async Task A_doctor_may_read_only_their_own_queue()
     {
         _fixture.SignedInAsDoctor(VisitServiceFixture.DoctorId);

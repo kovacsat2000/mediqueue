@@ -50,4 +50,31 @@ public sealed class VisitQueryService(
 
         return new RoleScopedVisit(null, visit.ToDetail(patient, specialtyName, doctorName));
     }
+
+    /// <summary>
+    /// Visits that have arrived but have not been routed to anybody.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It reads visits, so it lives with the other visit reads rather than with
+    /// the queues: an unrouted visit is in nobody's queue, and a class that
+    /// answers "what is in the queues" should not also answer "what is in none
+    /// of them".
+    /// </para>
+    /// <para>
+    /// The summary projection, because this is an assistant-facing listing.
+    /// </para>
+    /// </remarks>
+    /// <param name="cancellationToken">Cancels the queries.</param>
+    /// <returns>Registered visits, oldest arrival first.</returns>
+    /// <exception cref="NotFoundException">A visit references a patient that does not exist.</exception>
+    public async Task<IReadOnlyList<VisitSummaryDto>> GetUnassignedAsync(CancellationToken cancellationToken)
+    {
+        var unassigned = await visits.GetUnassignedAsync(cancellationToken).ConfigureAwait(false);
+
+        var patientsById = await context.LoadPatientsAsync(unassigned, cancellationToken).ConfigureAwait(false);
+        var (specialtyNames, doctorNames) = await context.LoadLookupsAsync(cancellationToken).ConfigureAwait(false);
+
+        return unassigned.ToSummaries(patientsById, specialtyNames, doctorNames);
+    }
 }

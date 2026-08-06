@@ -13,8 +13,7 @@ public sealed class VisitsController(
     VisitRegistrationService registration,
     VisitAssignmentService assignment,
     VisitLifecycleService lifecycle,
-    VisitQueryService queries,
-    QueueQueryService queues) : ControllerBase
+    VisitQueryService queries) : ControllerBase
 {
     /// <summary>
     /// Names the read action for the Location header of a newly created visit.
@@ -170,7 +169,7 @@ public sealed class VisitsController(
     [ProducesResponseType<IReadOnlyList<VisitSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<VisitSummaryDto>>> GetUnassignedAsync(
         CancellationToken cancellationToken) =>
-        Ok(await queues.GetUnassignedAsync(cancellationToken).ConfigureAwait(false));
+        Ok(await queries.GetUnassignedAsync(cancellationToken).ConfigureAwait(false));
 
     /// <summary>Reads one visit, projected for the caller's role.</summary>
     /// <remarks>
