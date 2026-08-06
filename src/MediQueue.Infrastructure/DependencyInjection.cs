@@ -55,6 +55,14 @@ public static class DependencyInjection
         // whether anything broader belongs in front of persistence is a P4 call.
         services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<ISpecialtyDirectory, SpecialtyDirectory>();
+        services.AddScoped<IDoctorDirectory, DoctorDirectory>();
+
+        // The one aggregate with write behaviour, plus an explicit transaction
+        // boundary so a use case can say "commit now" without knowing what a
+        // DbContext is.
+        services.AddScoped<IPatientRepository, PatientRepository>();
+        services.AddScoped<IVisitRepository, VisitRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddMediQueueAuthentication(configuration);
 
