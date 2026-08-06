@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using MediQueue.Application.Authentication;
+using MediQueue.Application.Exceptions;
 using MediQueue.Domain.Exceptions;
 using MediQueue.Domain.Visits;
 using Microsoft.AspNetCore.Diagnostics;
@@ -123,6 +124,27 @@ public sealed class ProblemDetailsExceptionHandler(
             // whether the username was unknown, the password wrong, or the
             // account disabled.
             detail: AuthenticationFailedException.GenericMessage,
+            traceId: traceId),
+
+        ForbiddenException forbidden => Problem(
+            status: StatusCodes.Status403Forbidden,
+            type: "forbidden",
+            title: "You may not do that",
+            detail: forbidden.Message,
+            traceId: traceId),
+
+        NotFoundException notFound => Problem(
+            status: StatusCodes.Status404NotFound,
+            type: "not-found",
+            title: "Not found",
+            detail: notFound.Message,
+            traceId: traceId),
+
+        ConflictException conflict => Problem(
+            status: StatusCodes.Status409Conflict,
+            type: "conflict",
+            title: "The request conflicts with the current state",
+            detail: conflict.Message,
             traceId: traceId),
 
         DbUpdateConcurrencyException => Problem(

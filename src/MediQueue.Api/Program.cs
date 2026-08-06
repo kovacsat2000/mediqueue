@@ -1,7 +1,7 @@
+using MediQueue.Api;
 using MediQueue.Api.Errors;
 using MediQueue.Api.Health;
 using MediQueue.Api.OpenApi;
-using MediQueue.Application.Authentication;
 using MediQueue.Infrastructure;
 using MediQueue.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -38,9 +38,9 @@ try
     builder.Services.AddProblemDetails();
     builder.Services.AddExceptionHandler<ProblemDetailsExceptionHandler>();
 
-    // The login use case. Application services are registered here because the
-    // API is the composition root; they depend only on abstractions.
-    builder.Services.AddScoped<AuthenticationService>();
+    // The use cases. Registered here because the API is the composition root
+    // and Application may not take a dependency-injection package.
+    builder.Services.AddApplicationServices();
 
     // The composition root, and the only place the API touches Infrastructure.
     builder.Services.AddInfrastructure(builder.Configuration);
