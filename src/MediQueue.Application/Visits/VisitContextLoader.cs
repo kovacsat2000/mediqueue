@@ -48,6 +48,31 @@ public sealed class VisitContextLoader(
             doctorNames.NameOf(visit.DoctorId));
     }
 
+    /// <summary>
+    /// Loads only the surrounding names, for a caller that already holds the
+    /// patient.
+    /// </summary>
+    /// <remarks>
+    /// Registration has just created or found the patient, so reloading it would
+    /// be a query for something already in hand — and, in a test with a
+    /// substituted repository, a lookup for a row that was never written.
+    /// </remarks>
+    /// <param name="visit">The visit.</param>
+    /// <param name="cancellationToken">Cancels the queries.</param>
+    /// <returns>The specialty and doctor names, if assigned.</returns>
+    public async Task<(string? SpecialtyName, string? DoctorName)> LoadNamesAsync(
+        Visit visit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+
+        var specialtyNames = await SpecialtyNamesAsync(cancellationToken).ConfigureAwait(false);
+        var doctorNames = (await doctors.GetActiveAsync(null, cancellationToken).ConfigureAwait(false))
+            .ToNameLookup();
+
+        return (specialtyNames.NameOf(visit.SpecialtyId), doctorNames.NameOf(visit.DoctorId));
+    }
+
     /// <summary>Loads the lookups needed to project many visits at once.</summary>
     /// <param name="cancellationToken">Cancels the queries.</param>
     /// <returns>Specialty and doctor names, keyed by identifier.</returns>

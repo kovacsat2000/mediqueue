@@ -67,8 +67,9 @@ public sealed class VisitRegistrationService(
         // P5 that is also one audit boundary.
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        var (_, specialtyName, doctorName) =
-            await context.LoadAsync(visit, cancellationToken).ConfigureAwait(false);
+        // The patient is already in hand, so only the names are fetched.
+        var (specialtyName, doctorName) =
+            await context.LoadNamesAsync(visit, cancellationToken).ConfigureAwait(false);
 
         return visit.ToSummary(patient, specialtyName, doctorName);
     }
