@@ -1,4 +1,6 @@
+using DomainAuditAction = MediQueue.Domain.Auditing.AuditAction;
 using DomainUserRole = MediQueue.Domain.Users.UserRole;
+using WireAuditAction = MediQueue.Contracts.Auditing.AuditAction;
 using WireUserRole = MediQueue.Contracts.UserRole;
 
 namespace MediQueue.Application.Tests.Authentication;
@@ -35,5 +37,32 @@ public class WireContractTests
     {
         typeof(WireUserRole).ShouldNotBe(typeof(DomainUserRole));
         typeof(WireUserRole).Assembly.ShouldNotBe(typeof(DomainUserRole).Assembly);
+    }
+
+    [Fact]
+    public void The_wire_audit_action_and_the_domain_one_have_the_same_members()
+    {
+        Enum.GetNames<WireAuditAction>().ShouldBe(Enum.GetNames<DomainAuditAction>(), ignoreOrder: true);
+    }
+
+    [Fact]
+    public void The_wire_audit_action_and_the_domain_one_have_the_same_numeric_values()
+    {
+        // Same trap as the role: a mismatch would relabel a deletion as a
+        // creation on the wire without failing anything.
+        foreach (var name in Enum.GetNames<DomainAuditAction>())
+        {
+            var domain = (int)Enum.Parse<DomainAuditAction>(name);
+            var wire = (int)Enum.Parse<WireAuditAction>(name);
+
+            wire.ShouldBe(domain, $"audit action '{name}' must have the same value on both sides");
+        }
+    }
+
+    [Fact]
+    public void The_audit_actions_are_not_the_same_type()
+    {
+        typeof(WireAuditAction).ShouldNotBe(typeof(DomainAuditAction));
+        typeof(WireAuditAction).Assembly.ShouldNotBe(typeof(DomainAuditAction).Assembly);
     }
 }
