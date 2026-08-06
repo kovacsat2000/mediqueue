@@ -1,9 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Everything the two desktop shells share: the HTTP client, the SignalR
-    client, authentication state and the common view models.
+    Everything the two desktop shells share: the HTTP client, authentication
+    state and the view models.
+
+    There is deliberately no Avalonia reference here, and that is a hard rule.
+    CommunityToolkit.Mvvm is a source generator over INotifyPropertyChanged and
+    needs no UI framework, so every view model in this project is unit-testable
+    without starting one — and a problem in the UI cannot take the logic down
+    with it.
   -->
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MediQueue.Contracts\MediQueue.Contracts.csproj" />
   </ItemGroup>
