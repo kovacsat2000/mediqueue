@@ -87,14 +87,26 @@ public class UnassignedVisitsTests(PostgresFixture postgres) : IAsyncLifetime
         (await _assistant.GetFromJsonAsync<List<VisitSummaryDto>>("/api/visits/unassigned"))!;
 
     [Fact]
-    public async Task The_literal_segment_is_not_swallowed_by_the_id_route()
+    public async Task The_literal_segment_reaches_its_own_action()
     {
-        // Without the {id:guid} constraint on GET /api/visits/{id}, this request
-        // matches that route instead, and answers 400 on a failed GUID parse.
         var response = await _assistant.GetAsync("/api/visits/unassigned");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await response.Content.ReadFromJsonAsync<List<VisitSummaryDto>>()).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task An_identifier_that_is_not_a_guid_is_not_found_rather_than_malformed()
+    {
+        // This is what the {id:guid} constraint actually does, and it is worth
+        // stating because it is not what one might assume. The literal route
+        // above wins on precedence with or without the constraint — measured.
+        // The constraint decides how an unparseable id is answered: 404 with it,
+        // 400 without. A visit id that is not a GUID names no resource, so "not
+        // found" is the truthful reply.
+        var response = await _assistant.GetAsync("/api/visits/not-a-guid");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]

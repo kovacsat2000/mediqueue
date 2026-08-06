@@ -174,9 +174,15 @@ public sealed class VisitsController(
 
     /// <summary>Reads one visit, projected for the caller's role.</summary>
     /// <remarks>
-    /// The <c>{id:guid}</c> constraint is load-bearing: without it this route
-    /// would swallow the literal <c>unassigned</c> segment above and answer 400
-    /// on a failed GUID parse.
+    /// <para>
+    /// On the <c>{id:guid}</c> constraint: it does <strong>not</strong> stop this
+    /// route swallowing the literal <c>unassigned</c> segment above — measured,
+    /// and ASP.NET Core already ranks a literal segment ahead of a parameter, so
+    /// that request matches the right action either way. What the constraint
+    /// actually buys is the answer to an unparseable id: <c>404</c> with it,
+    /// <c>400</c> without. A visit id that is not a GUID names no resource, so
+    /// "not found" is the truthful reply and "your request was malformed" is not.
+    /// </para>
     /// <para>
     /// <strong>The response shape depends on who is asking.</strong> An assistant
     /// receives the summary projection, which has no diagnosis member at all. The
