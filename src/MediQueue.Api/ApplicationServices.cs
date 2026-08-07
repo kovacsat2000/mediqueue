@@ -27,6 +27,7 @@ public static class ApplicationServices
         services.AddScoped<AuthenticationService>();
 
         services.AddScoped<VisitContextLoader>();
+        services.AddScoped<VisitAnnouncer>();
         services.AddScoped<VisitRegistrationService>();
         services.AddScoped<VisitAssignmentService>();
         services.AddScoped<VisitLifecycleService>();

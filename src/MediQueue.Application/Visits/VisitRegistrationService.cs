@@ -15,6 +15,7 @@ public sealed class VisitRegistrationService(
     IUnitOfWork unitOfWork,
     VisitAssignmentService assignment,
     VisitContextLoader context,
+    VisitAnnouncer announcer,
     TimeProvider timeProvider)
 {
     /// <summary>Registers an arrival, optionally routing it straight to a queue.</summary>
@@ -71,6 +72,12 @@ public sealed class VisitRegistrationService(
         var (specialtyName, doctorName) =
             await context.LoadNamesAsync(visit, cancellationToken).ConfigureAwait(false);
 
-        return visit.ToSummary(patient, specialtyName, doctorName);
+        var summary = visit.ToSummary(patient, specialtyName, doctorName);
+
+        // After the commit. The announcer decides whether this arrival was
+        // routed or is still waiting for a specialty.
+        await announcer.RegisteredAsync(summary, cancellationToken).ConfigureAwait(false);
+
+        return summary;
     }
 }

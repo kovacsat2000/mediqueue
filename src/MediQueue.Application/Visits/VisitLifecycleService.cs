@@ -28,6 +28,7 @@ public sealed class VisitLifecycleService(
     IVisitRepository visits,
     IUnitOfWork unitOfWork,
     VisitContextLoader context,
+    VisitAnnouncer announcer,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
 {
@@ -39,9 +40,21 @@ public sealed class VisitLifecycleService(
     /// <exception cref="ForbiddenException">The visit belongs to another doctor.</exception>
     /// <exception cref="InvalidVisitTransitionException">The visit is not waiting.</exception>
     public Task<VisitDetailDto> CallInAsync(Guid visitId, CancellationToken cancellationToken) =>
-        ActOnOwnVisitAsync(visitId, visit => visit.CallIn(timeProvider.GetUtcNow()), cancellationToken);
+        ActOnOwnVisitAsync(
+            visitId,
+            visit => visit.CallIn(timeProvider.GetUtcNow()),
+            announcer.CalledInAsync,
+            cancellationToken);
 
     /// <summary>Records what the doctor found.</summary>
+    /// <remarks>
+    /// <strong>Deliberately announces nothing.</strong> A diagnosis changes no
+    /// queue, so no client's list is out of date because of it — and the one
+    /// event that would carry clinical information is the one event this system
+    /// does not publish. <c>plan.md</c> §6 lists five events and this is not
+    /// among them. The payload type could not carry a diagnosis in any case
+    /// (D-10); not publishing at all means the question never arises.
+    /// </remarks>
     /// <param name="visitId">The visit.</param>
     /// <param name="diagnosis">The finding.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -52,7 +65,7 @@ public sealed class VisitLifecycleService(
         Guid visitId,
         string diagnosis,
         CancellationToken cancellationToken) =>
-        ActOnOwnVisitAsync(visitId, visit => visit.RecordDiagnosis(diagnosis), cancellationToken);
+        ActOnOwnVisitAsync(visitId, visit => visit.RecordDiagnosis(diagnosis), announce: null, cancellationToken);
 
     /// <summary>Releases the patient and completes the visit.</summary>
     /// <param name="visitId">The visit.</param>
@@ -62,7 +75,11 @@ public sealed class VisitLifecycleService(
     /// <exception cref="ForbiddenException">The visit belongs to another doctor.</exception>
     /// <exception cref="InvalidVisitTransitionException">The visit is not in treatment.</exception>
     public Task<VisitDetailDto> ReleaseAsync(Guid visitId, CancellationToken cancellationToken) =>
-        ActOnOwnVisitAsync(visitId, visit => visit.Release(timeProvider.GetUtcNow()), cancellationToken);
+        ActOnOwnVisitAsync(
+            visitId,
+            visit => visit.Release(timeProvider.GetUtcNow()),
+            announcer.ReleasedAsync,
+            cancellationToken);
 
     /// <summary>Withdraws a visit. Assistant-only, and a logical delete.</summary>
     /// <param name="visitId">The visit.</param>
@@ -79,6 +96,11 @@ public sealed class VisitLifecycleService(
             timeProvider.GetUtcNow());
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // The doctor id survives the soft delete — a withdrawn visit remembers
+        // whose queue it was in — so the announcement knows which queue to
+        // remove the row from.
+        await announcer.DeletedAsync(visit.Id, visit.DoctorId, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Loads a visit, checks the caller owns it, acts, commits and projects.</summary>
@@ -90,6 +112,7 @@ public sealed class VisitLifecycleService(
     private async Task<VisitDetailDto> ActOnOwnVisitAsync(
         Guid visitId,
         Action<Visit> act,
+        Func<VisitSummaryDto, CancellationToken, Task>? announce,
         CancellationToken cancellationToken)
     {
         var visit = await visits.GetByIdAsync(visitId, cancellationToken).ConfigureAwait(false)
@@ -105,6 +128,16 @@ public sealed class VisitLifecycleService(
 
         var (patient, specialtyName, doctorName) =
             await context.LoadAsync(visit, cancellationToken).ConfigureAwait(false);
+
+        if (announce is not null)
+        {
+            // The summary, never the detail the caller receives. This method is
+            // the only place both projections exist at once, so it is the one
+            // place the wrong one could be published — and the notifier's
+            // signature makes that a compile error rather than a review note.
+            await announce(visit.ToSummary(patient, specialtyName, doctorName), cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         return visit.ToDetail(patient, specialtyName, doctorName);
     }

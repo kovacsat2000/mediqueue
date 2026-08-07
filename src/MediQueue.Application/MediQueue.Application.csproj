@@ -7,6 +7,17 @@
       which store produced it.
     -->
     <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <!--
+      ILogger<T> only. Same D-39 test as above and it passes for the same
+      reason: an interface whose implementation arrives at the composition
+      root, implying no storage, no transport and no hosting model. It is here
+      because VisitAnnouncer swallows push failures, and swallowing something
+      silently is how a broken push channel stays unnoticed.
+
+      It was already present transitively through Identity.Core. Declared
+      explicitly so the dependency is a decision rather than an accident.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <!-- Use cases and the interfaces the outer layers implement. -->

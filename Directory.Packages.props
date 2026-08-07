@@ -1,5 +1,4 @@
 <Project>
-
   <!--
     Central Package Management: every package version in the solution is
     declared here exactly once. Project files reference packages by id only.
@@ -8,13 +7,11 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
-
   <!-- Build-time only. Contributes nothing to any compiled output. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
   </ItemGroup>
-
   <!-- Persistence -->
   <ItemGroup>
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
@@ -22,8 +19,9 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <!-- PasswordHasher<T> only. The full ASP.NET Core Identity stack is not used. -->
     <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.10" />
+    <!-- ILogger<T> only, for the one place Application must not fail silently. -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
   </ItemGroup>
-
   <!-- API -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
@@ -38,7 +36,6 @@
     -->
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
   </ItemGroup>
-
   <!--
     Transitive pins. Microsoft.AspNetCore.OpenApi 10.0.10 resolves
     Microsoft.OpenApi 2.0.0, which carries GHSA-v5pm-xwqc-g5wc (high:
@@ -49,7 +46,6 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
   </ItemGroup>
-
   <!--
     Npgsql 10.0.3 declares Entity Framework Core 10.0.4, while
     EntityFrameworkCore.Design resolves 10.0.10. Because Design is
@@ -64,7 +60,6 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Analyzers" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
   </ItemGroup>
-
   <!-- Desktop clients -->
   <ItemGroup>
     <PackageVersion Include="Avalonia" Version="12.1.1" />
@@ -78,7 +73,6 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.10" />
   </ItemGroup>
-
   <!-- Tests -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
@@ -90,5 +84,4 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
-
 </Project>

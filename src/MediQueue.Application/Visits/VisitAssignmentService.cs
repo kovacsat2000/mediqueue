@@ -22,6 +22,7 @@ public sealed class VisitAssignmentService(
     IDoctorAssignmentStrategy strategy,
     IUnitOfWork unitOfWork,
     VisitContextLoader context,
+    VisitAnnouncer announcer,
     TimeProvider timeProvider)
 {
     /// <summary>Routes a visit to a specialty and puts it in the chosen doctor's queue.</summary>
@@ -45,7 +46,14 @@ public sealed class VisitAssignmentService(
         var (patient, specialtyName, doctorName) =
             await context.LoadAsync(visit, cancellationToken).ConfigureAwait(false);
 
-        return visit.ToSummary(patient, specialtyName, doctorName);
+        var summary = visit.ToSummary(patient, specialtyName, doctorName);
+
+        // After the commit, and only from this overload. The internal one below
+        // does not commit — registration owns that transaction, and announcing
+        // from inside it would publish a queue entry that may still roll back.
+        await announcer.QueuedAsync(summary, cancellationToken).ConfigureAwait(false);
+
+        return summary;
     }
 
     /// <summary>

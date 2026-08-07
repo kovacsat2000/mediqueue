@@ -5,6 +5,7 @@ using MediQueue.Domain.Patients;
 using MediQueue.Domain.Scheduling;
 using MediQueue.Domain.Users;
 using MediQueue.Domain.Visits;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
@@ -34,6 +35,7 @@ public sealed class VisitServiceFixture
     public IDoctorAssignmentStrategy Strategy { get; } = Substitute.For<IDoctorAssignmentStrategy>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
     public ICurrentUser CurrentUser { get; } = Substitute.For<ICurrentUser>();
+    public IRealtimeNotifier Notifier { get; } = Substitute.For<IRealtimeNotifier>();
     public FakeTimeProvider Clock { get; } = new(Now);
 
     public VisitServiceFixture()
@@ -85,14 +87,24 @@ public sealed class VisitServiceFixture
 
     public VisitContextLoader Context => new(Patients, Specialties, Doctors);
 
+    /// <summary>
+    /// The real announcer over a substituted transport.
+    /// </summary>
+    /// <remarks>
+    /// Concrete on purpose. The guarantee that a failed push cannot fail a
+    /// committed write lives in this class, so substituting it would test a
+    /// world in which that guarantee does not exist.
+    /// </remarks>
+    public VisitAnnouncer Announcer => new(Notifier, NullLogger<VisitAnnouncer>.Instance);
+
     public VisitAssignmentService Assignment =>
-        new(Visits, Doctors, Specialties, Strategy, UnitOfWork, Context, Clock);
+        new(Visits, Doctors, Specialties, Strategy, UnitOfWork, Context, Announcer, Clock);
 
     public VisitRegistrationService Registration =>
-        new(Patients, Visits, UnitOfWork, Assignment, Context, Clock);
+        new(Patients, Visits, UnitOfWork, Assignment, Context, Announcer, Clock);
 
     public VisitLifecycleService Lifecycle =>
-        new(Visits, UnitOfWork, Context, CurrentUser, Clock);
+        new(Visits, UnitOfWork, Context, Announcer, CurrentUser, Clock);
 
     public VisitQueryService Query => new(Visits, Context, CurrentUser);
 
@@ -129,6 +141,17 @@ public sealed class VisitServiceFixture
             .Returns(patient);
 
         return patient;
+    }
+
+    /// <summary>A registered visit that has not been routed anywhere yet.</summary>
+    public Visit AnUnroutedVisit(Patient? patient = null)
+    {
+        patient ??= APatient();
+        var visit = Visit.Register(patient.Id, "Fejfájás", Now);
+
+        Visits.GetByIdAsync(visit.Id, Arg.Any<CancellationToken>()).Returns(visit);
+
+        return visit;
     }
 
     /// <summary>A visit already in a doctor's queue, findable by the substituted repository.</summary>
