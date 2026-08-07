@@ -12,9 +12,13 @@ on:
 permissions:
   contents: read
 
+# Runs queue rather than cancel. GitHub reports a cancelled run's conclusion as
+# `failure`, so cancelling produces red entries in the Actions tab that are not
+# failures and cannot be told apart without `gh run view`. This repository is
+# the submission and its history is read as evidence, so red must mean red.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   DOTNET_NOLOGO: true

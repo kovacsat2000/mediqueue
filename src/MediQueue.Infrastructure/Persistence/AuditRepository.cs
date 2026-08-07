@@ -46,32 +46,16 @@ public sealed class AuditRepository(MediQueueDbContext database) : IAuditReposit
 
     /// <summary>Applies the filters the specification asks for.</summary>
     /// <remarks>
-    /// <para>
-    /// The requirement is real: a deleted visit's history is the history most
-    /// worth having, and a record that vanishes from the audit trail the moment
-    /// somebody withdraws it is not an audit trail. It is asserted by
-    /// <c>A_soft_delete_is_recorded_as_a_deletion_and_its_history_survives</c>.
-    /// </para>
-    /// <para>
-    /// <strong><c>IgnoreQueryFilters</c> is not what satisfies it, and the
-    /// comment here used to claim otherwise.</strong> Measured by deleting the
-    /// call: no test changes. The only query filter in this system is on
-    /// <c>Visit</c>, and this query touches <c>AuditEntry</c> and
-    /// <c>AuditFieldChange</c> — neither is filtered, and neither has a
-    /// navigation to a visit, because an audit entry deliberately carries no
-    /// foreign keys so that it outlives what it describes. Nothing filtered
-    /// participates, so nothing is being ignored.
-    /// </para>
-    /// <para>
-    /// The call is kept because <c>plan.md</c> §5 states the requirement in
-    /// these terms and reversing that is the controller session's decision, not
-    /// this one's. Recorded here so the next reader inherits the measurement
-    /// rather than the assumption.
-    /// </para>
+    /// A deleted visit's history stays readable here, and the test that proves
+    /// it is <c>A_soft_delete_is_recorded_as_a_deletion_and_its_history_survives</c>
+    /// — it withdraws a visit through the API, confirms the visit itself now
+    /// answers 404, and reads its whole life back out of this query. Nothing in
+    /// this method has to opt out of anything to make that true: no audit table
+    /// carries a query filter, and neither has a navigation to a visit (D-57).
     /// </remarks>
     private IQueryable<AuditEntry> Filtered(AuditQuery query)
     {
-        var entries = database.AuditEntries.IgnoreQueryFilters();
+        var entries = database.AuditEntries.AsQueryable();
 
         if (query.PatientId is { } patientId)
         {

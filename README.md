@@ -13,9 +13,26 @@ assistant can see that a diagnosis was recorded, but never what it says.
 
 ## Status
 
-Foundations only. The solution builds, tests and runs; there is no business
-logic yet. The API exposes a health check and an OpenAPI document, and both
-desktop clients open an unmodified template window.
+> **Interim.** This section is kept accurate as the system is built; the full
+> write-up — architecture, decisions and a walkthrough — replaces it at the end.
+
+**Working today.** The API implements the whole visit lifecycle: an assistant
+registers a patient, the server routes them to a doctor by shortest queue, and
+that doctor calls them in, records a diagnosis and releases them. Access is
+role-based and enforced server-side — an assistant never receives a diagnosis in
+any response, and a doctor can only act on visits in their own queue. Every data
+modification is audited with the acting user, and the audit log is queryable
+with clinical values redacted for assistants. Every state change is pushed to
+connected clients over an authenticated WebSocket. The doctor desktop client
+signs in and shows its queue, updating live.
+
+**Not built yet.** The assistant desktop client is a template window. The doctor
+client is a deliberate skeleton — it lists the queue but does not yet act on it —
+and both are finished in the next phase.
+
+**Running it** is below. The demo accounts and their shared password live in
+`src/MediQueue.Api/appsettings.Development.json`; they unlock nothing but a local
+container, and the seeded practice is created on first start.
 
 ## Prerequisites
 
