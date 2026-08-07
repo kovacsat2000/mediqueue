@@ -1,3 +1,5 @@
+using MediQueue.Contracts.Visits;
+
 namespace MediQueue.Client.Core.ViewModels;
 
 /// <summary>One row of a doctor's waiting list, ready to render.</summary>
@@ -19,7 +21,11 @@ namespace MediQueue.Client.Core.ViewModels;
 /// <param name="Taj">Their TAJ number, in the dashed form.</param>
 /// <param name="Complaint">What they came in with.</param>
 /// <param name="QueuedAtDisplay">When they joined the queue, in local time.</param>
-/// <param name="Status">How far the visit has progressed, for display.</param>
+/// <param name="Status">
+/// How far the visit has progressed. The wire enum rather than a string,
+/// because the buttons are enabled from it — and comparing a display string
+/// would make a label change silently disable an action.
+/// </param>
 public sealed record QueueRow(
     Guid VisitId,
     DateTimeOffset? QueuedAt,
@@ -27,4 +33,8 @@ public sealed record QueueRow(
     string Taj,
     string Complaint,
     string QueuedAtDisplay,
-    string Status);
+    VisitStatus Status)
+{
+    /// <summary>The status as a label. Derived, so there is one source for both.</summary>
+    public string StatusDisplay => Status.ToString();
+}

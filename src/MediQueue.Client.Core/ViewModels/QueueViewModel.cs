@@ -11,7 +11,7 @@ namespace MediQueue.Client.Core.ViewModels;
 /// <summary>The signed-in doctor's waiting list, kept current by push.</summary>
 public sealed partial class QueueViewModel : ObservableObject
 {
-    private readonly MediQueueApiClient _api;
+    private readonly IDoctorApi _api;
     private readonly IAuthSession _session;
     private readonly IQueueConnection _realtime;
     private readonly TimeProvider _timeProvider;
@@ -22,7 +22,7 @@ public sealed partial class QueueViewModel : ObservableObject
     /// <param name="realtime">The push channel.</param>
     /// <param name="timeProvider">Supplies the zone times are displayed in.</param>
     public QueueViewModel(
-        MediQueueApiClient api,
+        IDoctorApi api,
         IAuthSession session,
         IQueueConnection realtime,
         TimeProvider timeProvider)
@@ -180,6 +180,184 @@ public sealed partial class QueueViewModel : ObservableObject
         }
     }
 
+    /// <summary>The row the doctor is acting on, if any.</summary>
+    [ObservableProperty]
+    public partial QueueRow? SelectedRow { get; set; }
+
+    /// <summary>
+    /// The selected visit in full, fetched only while it is in treatment.
+    /// </summary>
+    /// <remarks>
+    /// The only place this client asks for <c>VisitDetailDto</c>. The queue
+    /// itself is summaries, so a screenful of waiting patients is not a
+    /// screenful of clinical records — the detail is one visit, deliberately,
+    /// and only the one being treated.
+    /// </remarks>
+    [ObservableProperty]
+    public partial VisitDetailDto? SelectedDetail { get; set; }
+
+    /// <summary>What the doctor is typing into the diagnosis box.</summary>
+    [ObservableProperty]
+    public partial string DiagnosisText { get; set; } = string.Empty;
+
+    /// <summary>The server's refusal of the last action, if it refused one.</summary>
+    [ObservableProperty]
+    public partial string? ActionError { get; set; }
+
+    /// <summary>Whether the selected visit can be called in.</summary>
+    /// <remarks>
+    /// <para>
+    /// Enabled from the status the server last reported. That is presentation:
+    /// it stops a doctor pressing a button that is certain to be refused.
+    /// </para>
+    /// <para>
+    /// <strong>It is not the state machine.</strong> Whether a transition is
+    /// legal is decided in <c>Domain</c> and enforced by the API; if this
+    /// property and the server ever disagree, the server wins and its 409 —
+    /// which already carries <c>allowedTransitions</c> — is what the doctor
+    /// sees. Re-deriving the rules here would create a second definition that
+    /// could drift.
+    /// </para>
+    /// </remarks>
+    public bool CanCallIn => SelectedRow?.Status == VisitStatus.Waiting && !IsActing;
+
+    /// <summary>Whether a diagnosis can be recorded against the selected visit.</summary>
+    public bool CanRecordDiagnosis =>
+        SelectedRow?.Status == VisitStatus.InTreatment && !IsActing && !string.IsNullOrWhiteSpace(DiagnosisText);
+
+    /// <summary>Whether the selected patient can be released.</summary>
+    public bool CanRelease => SelectedRow?.Status == VisitStatus.InTreatment && !IsActing;
+
+    /// <summary>Whether an action is in flight.</summary>
+    [ObservableProperty]
+    public partial bool IsActing { get; set; }
+
+    /// <summary>Calls the selected patient in.</summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    [RelayCommand]
+    public Task CallInAsync(CancellationToken cancellationToken) =>
+        ActAsync(visitId => _api.CallInAsync(visitId, cancellationToken));
+
+    /// <summary>Records what the doctor found against the selected visit.</summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    [RelayCommand]
+    public Task RecordDiagnosisAsync(CancellationToken cancellationToken) =>
+        ActAsync(visitId => _api.RecordDiagnosisAsync(visitId, DiagnosisText, cancellationToken));
+
+    /// <summary>Releases the selected patient.</summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    [RelayCommand]
+    public Task ReleaseAsync(CancellationToken cancellationToken) =>
+        ActAsync(visitId => _api.ReleaseAsync(visitId, cancellationToken));
+
+    /// <summary>
+    /// Runs one action against the selected visit and reports what the server
+    /// said.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Always the selected visit.</strong> The identifier comes from
+    /// <see cref="SelectedRow"/> and never from the head of the list — a doctor
+    /// who selects the third patient and presses Call in must not call in the
+    /// first, and that is exactly the mistake a "take the first waiting one"
+    /// convenience would make.
+    /// </para>
+    /// <para>
+    /// <strong>Nothing optimistic.</strong> The rows are not touched here at
+    /// all. The server's response updates the detail, and the push updates the
+    /// list — with push already delivering every change, an optimistic update
+    /// buys nothing and creates a reconciliation problem. When the server
+    /// refuses, the list is therefore unchanged by construction rather than by
+    /// a rollback.
+    /// </para>
+    /// </remarks>
+    private async Task ActAsync(Func<Guid, Task<VisitDetailDto>> act)
+    {
+        if (SelectedRow is not { } row)
+        {
+            return;
+        }
+
+        IsActing = true;
+        ActionError = null;
+        RaiseActionAvailability();
+
+        try
+        {
+            SelectedDetail = await act(row.VisitId).ConfigureAwait(true);
+            DiagnosisText = SelectedDetail.Diagnosis ?? string.Empty;
+        }
+        catch (ApiException exception)
+        {
+            // The server's own sentence: a 403 says the visit is not in your
+            // queue without naming the colleague, and a 409 says which states
+            // it would have accepted.
+            ActionError = exception.TraceId is null
+                ? exception.Detail
+                : $"{exception.Detail} (reference {exception.TraceId})";
+        }
+        catch (HttpRequestException)
+        {
+            ActionError = "The server is not reachable. Check that it is running.";
+        }
+        finally
+        {
+            IsActing = false;
+            RaiseActionAvailability();
+        }
+    }
+
+    /// <summary>Loads the detail for a visit that is being treated, and clears it otherwise.</summary>
+    partial void OnSelectedRowChanged(QueueRow? value)
+    {
+        ActionError = null;
+        RaiseActionAvailability();
+
+        if (value is null || value.Status != VisitStatus.InTreatment)
+        {
+            SelectedDetail = null;
+            DiagnosisText = string.Empty;
+
+            return;
+        }
+
+        _ = LoadDetailAsync(value.VisitId);
+    }
+
+    partial void OnDiagnosisTextChanged(string value) => OnPropertyChanged(nameof(CanRecordDiagnosis));
+
+    partial void OnIsActingChanged(bool value) => RaiseActionAvailability();
+
+    private async Task LoadDetailAsync(Guid visitId)
+    {
+        try
+        {
+            var detail = await _api.GetVisitAsync(visitId, CancellationToken.None).ConfigureAwait(true);
+
+            // The selection may have moved while the request was outstanding.
+            if (SelectedRow?.VisitId == visitId)
+            {
+                SelectedDetail = detail;
+                DiagnosisText = detail.Diagnosis ?? string.Empty;
+            }
+        }
+        catch (ApiException exception)
+        {
+            ActionError = exception.Detail;
+        }
+        catch (HttpRequestException)
+        {
+            ActionError = "The server is not reachable. Check that it is running.";
+        }
+    }
+
+    private void RaiseActionAvailability()
+    {
+        OnPropertyChanged(nameof(CanCallIn));
+        OnPropertyChanged(nameof(CanRecordDiagnosis));
+        OnPropertyChanged(nameof(CanRelease));
+    }
+
     /// <summary>
     /// Applies one pushed change under the same lock a refresh holds.
     /// </summary>
@@ -241,6 +419,15 @@ public sealed partial class QueueViewModel : ObservableObject
             // does not make a patient jump around the screen.
             Rows[Rows.IndexOf(existing)] = replacement;
 
+            // The selection follows the row it named. Without this the doctor
+            // calls a patient in, the push arrives saying InTreatment, and the
+            // buttons stay enabled for a state the visit has already left —
+            // because SelectedRow would still hold the record it was given.
+            if (SelectedRow?.VisitId == replacement.VisitId)
+            {
+                SelectedRow = replacement;
+            }
+
             return;
         }
 
@@ -252,6 +439,13 @@ public sealed partial class QueueViewModel : ObservableObject
         if (Rows.FirstOrDefault(row => row.VisitId == visitId) is { } row)
         {
             Rows.Remove(row);
+        }
+
+        // A released or withdrawn visit cannot stay selected: the actions would
+        // then point at a row that is no longer on screen.
+        if (SelectedRow?.VisitId == visitId)
+        {
+            SelectedRow = null;
         }
     }
 
@@ -281,7 +475,7 @@ public sealed partial class QueueViewModel : ObservableObject
         visit.Taj,
         visit.Complaint,
         FormatLocal(visit.QueuedAt),
-        visit.Status.ToString());
+        visit.Status);
 
     /// <summary>
     /// Renders a UTC instant in the configured local zone.

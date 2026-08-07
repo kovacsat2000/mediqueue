@@ -1,6 +1,7 @@
 using System.Net;
 using MediQueue.Client.Core.Api;
 using MediQueue.Client.Core.ViewModels;
+using MediQueue.Contracts;
 using Microsoft.Extensions.Time.Testing;
 
 namespace MediQueue.Client.Core.Tests;
@@ -171,7 +172,7 @@ public class ViewModelTests
             HttpStatusCode.Unauthorized,
             """{"title":"Authentication failed","status":401,"detail":"Invalid username or password.","traceId":"00-x-y-00"}""",
             "application/problem+json");
-        var login = new LoginViewModel(Api, _session) { Username = "kovacs.istvan", Password = "wrong" };
+        var login = new LoginViewModel(Api, _session, UserRole.Doctor) { Username = "kovacs.istvan", Password = "wrong" };
 
         await login.SignInAsync(default);
 
@@ -190,7 +191,8 @@ public class ViewModelTests
             {
                 BaseAddress = new Uri("http://localhost:5123/"),
             }, _session),
-            _session)
+            _session,
+            UserRole.Doctor)
         { Username = "kovacs.istvan", Password = "MediQueue123!" };
 
         await login.SignInAsync(default);
@@ -203,7 +205,7 @@ public class ViewModelTests
     public async Task A_successful_doctor_sign_in_raises_the_event()
     {
         _handler.Respond(HttpStatusCode.OK, DoctorLogin);
-        var login = new LoginViewModel(Api, _session) { Username = "kovacs.istvan", Password = "MediQueue123!" };
+        var login = new LoginViewModel(Api, _session, UserRole.Doctor) { Username = "kovacs.istvan", Password = "MediQueue123!" };
         var raised = false;
         login.SignedIn += (_, _) => raised = true;
 
@@ -221,7 +223,7 @@ public class ViewModelTests
         // Each shell accepts only its own role. Showing an assistant an empty
         // doctor queue would look like a bug rather than like a refusal.
         _handler.Respond(HttpStatusCode.OK, AssistantLogin);
-        var login = new LoginViewModel(Api, _session) { Username = "horvath.anna", Password = "MediQueue123!" };
+        var login = new LoginViewModel(Api, _session, UserRole.Doctor) { Username = "horvath.anna", Password = "MediQueue123!" };
         var raised = false;
         login.SignedIn += (_, _) => raised = true;
 
@@ -236,9 +238,9 @@ public class ViewModelTests
     public async Task The_shell_moves_to_the_queue_once_a_doctor_signs_in()
     {
         _handler.Respond(HttpStatusCode.OK, DoctorLogin).Respond(HttpStatusCode.OK, "[]");
-        var login = new LoginViewModel(Api, _session);
+        var login = new LoginViewModel(Api, _session, UserRole.Doctor);
         var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
-        var shell = new ShellViewModel(login, queue);
+        var shell = new ShellViewModel(login, queue, queue.StartCommand);
 
         shell.Current.ShouldBeSameAs(login);
 
@@ -271,9 +273,9 @@ public class ViewModelTests
     public async Task Signing_in_leaves_the_shell_with_a_single_load_running()
     {
         _handler.Respond(HttpStatusCode.OK, DoctorLogin).Respond(HttpStatusCode.OK, QueueAtEightUtc);
-        var login = new LoginViewModel(Api, _session);
+        var login = new LoginViewModel(Api, _session, UserRole.Doctor);
         var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
-        _ = new ShellViewModel(login, queue);
+        _ = new ShellViewModel(login, queue, queue.StartCommand);
 
         login.Username = "kovacs.istvan";
         login.Password = "MediQueue123!";

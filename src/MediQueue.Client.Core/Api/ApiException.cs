@@ -15,13 +15,22 @@ namespace MediQueue.Client.Core.Api;
 /// </remarks>
 public sealed class ApiException : Exception
 {
-    private ApiException(int status, string? title, string detail, string? traceId)
+    private static readonly IReadOnlyDictionary<string, string[]> NoErrors =
+        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+    private ApiException(
+        int status,
+        string? title,
+        string detail,
+        string? traceId,
+        IReadOnlyDictionary<string, string[]>? errors = null)
         : base(detail)
     {
         Status = status;
         Title = title;
         Detail = detail;
         TraceId = traceId;
+        Errors = errors ?? NoErrors;
     }
 
     /// <summary>The HTTP status code.</summary>
@@ -42,6 +51,24 @@ public sealed class ApiException : Exception
     /// the entry that says everything.
     /// </remarks>
     public string? TraceId { get; }
+
+    /// <summary>
+    /// The server's per-field messages from a validation failure, keyed by the
+    /// field name the domain used. Empty for every other kind of failure.
+    /// </summary>
+    /// <remarks>
+    /// This is what lets a form put the message next to the input that caused
+    /// it. It is deliberately the server's own text: the clients do not
+    /// re-implement the TAJ or name rules, so the only place that knows why a
+    /// value was refused is the domain that refused it.
+    /// </remarks>
+    public IReadOnlyDictionary<string, string[]> Errors { get; }
+
+    /// <summary>The server's message for one field, if it named that field.</summary>
+    /// <param name="fieldName">The field, matched case-insensitively.</param>
+    /// <returns>The first message, or <c>null</c>.</returns>
+    public string? ErrorFor(string fieldName) =>
+        Errors.TryGetValue(fieldName, out var messages) && messages.Length > 0 ? messages[0] : null;
 
     /// <summary>Builds the exception from a failed response, however it is shaped.</summary>
     /// <param name="response">The failed response.</param>
@@ -71,7 +98,12 @@ public sealed class ApiException : Exception
 
                     if (detail is not null)
                     {
-                        return new ApiException(status, Text(root, "title"), detail, Text(root, "traceId"));
+                        return new ApiException(
+                            status,
+                            Text(root, "title"),
+                            detail,
+                            Text(root, "traceId"),
+                            FieldErrors(root));
                     }
                 }
             }
@@ -86,6 +118,44 @@ public sealed class ApiException : Exception
         }
 
         return new ApiException(status, null, Fallback(response.StatusCode), null);
+    }
+
+    /// <summary>
+    /// Reads the <c>errors</c> extension: field name to messages.
+    /// </summary>
+    /// <remarks>
+    /// Shaped like ASP.NET Core's own validation problem, which is what the
+    /// server deliberately emits, so a client has one thing to render rather
+    /// than two. Anything that is not that shape is ignored rather than
+    /// throwing — this method runs while the client is already handling a
+    /// failure, and failing here would replace the server's message with a
+    /// parser's.
+    /// </remarks>
+    private static IReadOnlyDictionary<string, string[]> FieldErrors(JsonElement root)
+    {
+        if (!root.TryGetProperty("errors", out var errors) || errors.ValueKind != JsonValueKind.Object)
+        {
+            return NoErrors;
+        }
+
+        var byField = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var field in errors.EnumerateObject())
+        {
+            if (field.Value.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            byField[field.Name] =
+            [
+                .. field.Value.EnumerateArray()
+                    .Where(message => message.ValueKind == JsonValueKind.String)
+                    .Select(message => message.GetString()!),
+            ];
+        }
+
+        return byField;
     }
 
     private static string? Text(JsonElement root, string property) =>

@@ -134,13 +134,13 @@ public class RealtimeQueueTests
         await SettleAsync(() => queue.Rows.Count == 2);
 
         _realtime.PushCalledIn(first with { Status = VisitStatus.InTreatment });
-        await SettleAsync(() => queue.Rows[0].Status == nameof(VisitStatus.InTreatment));
+        await SettleAsync(() => queue.Rows[0].Status == VisitStatus.InTreatment);
 
         queue.Rows.Count.ShouldBe(2);
 
         // Still first: a status change must not make a patient jump position.
         queue.Rows[0].PatientFullName.ShouldBe("Első Beteg");
-        queue.Rows[0].Status.ShouldBe(nameof(VisitStatus.InTreatment));
+        queue.Rows[0].Status.ShouldBe(VisitStatus.InTreatment);
     }
 
     [Fact]
