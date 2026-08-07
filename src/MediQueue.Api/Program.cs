@@ -4,6 +4,7 @@ using MediQueue.Api.Health;
 using MediQueue.Api.OpenApi;
 using MediQueue.Infrastructure;
 using MediQueue.Infrastructure.Persistence;
+using MediQueue.Infrastructure.Realtime;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
@@ -102,6 +103,11 @@ try
 
     app.MapControllers();
     app.MapMediQueueHealthChecks();
+
+    // The endpoint lives here, in the composition root, even though the hub type
+    // is in Infrastructure — the notifier needs IHubContext<QueueHub> and the
+    // dependency only points one way.
+    app.MapHub<QueueHub>(QueueHub.Path);
 
     app.Run();
     return 0;

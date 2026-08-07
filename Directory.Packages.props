@@ -72,6 +72,12 @@
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.10" />
+    <!--
+      The push channel's client half. Not in the shared framework — the server
+      side is, the client side ships as a package so non-ASP.NET hosts (a
+      desktop app, exactly this case) can consume a hub.
+    -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.10" />
   </ItemGroup>
   <!-- Tests -->
   <ItemGroup>

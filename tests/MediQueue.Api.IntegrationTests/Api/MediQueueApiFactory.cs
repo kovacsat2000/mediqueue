@@ -61,6 +61,10 @@ public sealed class MediQueueApiFactory(PostgresFixture postgres) : WebApplicati
                 .AddControllers()
                 .AddApplicationPart(typeof(TestOnlyController).Assembly);
 
+            // Same arrangement, one transport along: a hub that exists only to
+            // make the DI scope of a hub invocation observable.
+            services.AddSingleton<IStartupFilter, ScopeProbeHubStartupFilter>();
+
             if (_clock is not null)
             {
                 services.RemoveAll<TimeProvider>();

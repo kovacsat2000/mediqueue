@@ -12,6 +12,11 @@
   -->
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <!--
+      HubConnection. A client library, not a UI framework and not a hosting
+      model, so the rule above still holds: nothing here needs a window.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 
   <ItemGroup>

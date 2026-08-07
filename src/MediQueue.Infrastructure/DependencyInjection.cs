@@ -4,6 +4,7 @@ using MediQueue.Infrastructure.Auditing;
 using MediQueue.Infrastructure.Authentication;
 using MediQueue.Infrastructure.Directory;
 using MediQueue.Infrastructure.Persistence;
+using MediQueue.Infrastructure.Realtime;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -77,6 +78,11 @@ public static class DependencyInjection
 
         // Read-only: the trail is written by the interceptor, never by a caller.
         services.AddScoped<IAuditRepository, AuditRepository>();
+
+        // The push channel. SignalR itself is added here rather than in the API
+        // so that everything this layer implements is registered in one place.
+        services.AddSignalR();
+        services.AddScoped<IRealtimeNotifier, SignalRRealtimeNotifier>();
 
         services.AddMediQueueAuthentication(configuration);
 

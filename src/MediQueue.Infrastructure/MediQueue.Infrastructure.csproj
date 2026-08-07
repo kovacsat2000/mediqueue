@@ -4,11 +4,31 @@
     Implements the Application layer's interfaces: EF Core persistence,
     the audit interceptor, authentication and the SignalR notifier.
   -->
+  <!--
+    SignalR's Hub and IHubContext, and the ASP.NET Core types the auth code
+    already used transitively. A framework reference rather than a package: the
+    shared framework is already on the machine that runs the API, so this adds
+    nothing to the output.
+
+    It is Infrastructure and not Api because SignalRRealtimeNotifier needs
+    IHubContext<QueueHub>, and Api references Infrastructure rather than the
+    other way round. Api still owns the endpoint: MapHub is in Program.cs.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <!-- PasswordHasher<T> only, for the seeder; P3 reuses it for login. -->
-    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <!--
+      PasswordHasher<T> is used here for the seeder and for login, but it is no
+      longer referenced as a package: Microsoft.Extensions.Identity.Core is part
+      of the Microsoft.AspNetCore.App shared framework, so once the framework
+      reference above arrived, keeping the package too raised NU1510 — a build
+      failure here. Application still references it as a package, because
+      Application deliberately has no framework reference.
+    -->
     <!-- Design-time only: `dotnet ef` needs it, the running application does not. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

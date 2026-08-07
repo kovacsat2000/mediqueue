@@ -1,4 +1,5 @@
 using System.Text;
+using MediQueue.Infrastructure.Realtime;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,6 +63,8 @@ public static class AuthenticationExtensions
                     NameClaimType = JwtRegisteredClaimNames.Name,
                     RoleClaimType = JwtTokenIssuer.RoleClaim,
                 };
+
+                bearer.Events = new JwtBearerEvents { OnMessageReceived = ReadHubAccessToken };
             });
 
         // Named policies rather than [Authorize(Roles = "...")] scattered around.
@@ -82,6 +85,42 @@ public static class AuthenticationExtensions
                 .Build());
 
         return services;
+    }
+
+    /// <summary>
+    /// Accepts a bearer token from the <c>access_token</c> query string, for hub
+    /// requests and for nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A browser WebSocket cannot set an <c>Authorization</c> header, so SignalR
+    /// puts the token in the query string. That is the only reason this exists.
+    /// </para>
+    /// <para>
+    /// <strong>The path check is the point of the method, not a detail of it.</strong>
+    /// A token in a query string is a token in every access log, every proxy
+    /// record, every referrer header and every URL somebody pastes into a bug
+    /// report. Honouring <c>access_token</c> on <em>all</em> paths would mean
+    /// any request in the system could be authenticated by a live credential
+    /// sitting in plain text in a log file — and it would do so silently,
+    /// because everything would keep working. Restricting it to the hub confines
+    /// that exposure to one route whose clients genuinely cannot do better.
+    /// </para>
+    /// <para>
+    /// <c>StartsWith</c> rather than equality because SignalR appends its own
+    /// segments — <c>/negotiate</c> — beneath the hub path.
+    /// </para>
+    /// </remarks>
+    private static Task ReadHubAccessToken(MessageReceivedContext context)
+    {
+        var path = context.HttpContext.Request.Path;
+
+        if (path.StartsWithSegments(QueueHub.Path, StringComparison.OrdinalIgnoreCase))
+        {
+            context.Token = context.Request.Query["access_token"];
+        }
+
+        return Task.CompletedTask;
     }
 
     private static void EnsureSigningKeyIsUsable(JwtOptions options)
