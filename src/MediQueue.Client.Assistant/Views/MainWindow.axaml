@@ -1,22 +1,26 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:MediQueue.Client.Assistant.ViewModels"
+        xmlns:vm="using:MediQueue.Client.Core.ViewModels"
+        xmlns:views="using:MediQueue.Client.Assistant.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1040" d:DesignHeight="720"
         x:Class="MediQueue.Client.Assistant.Views.MainWindow"
-        x:DataType="vm:MainViewModel"
+        x:DataType="vm:ShellViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="MediQueue.Client.Assistant">
+        Width="1040" Height="720"
+        Title="MediQueue — Asszisztens">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainViewModel />
-    </Design.DataContext>
-
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+  <!-- Which screen shows is the shell view model's decision, not the window's. -->
+  <ContentControl Content="{Binding Current}">
+    <ContentControl.DataTemplates>
+      <DataTemplate DataType="vm:LoginViewModel">
+        <views:LoginView />
+      </DataTemplate>
+      <DataTemplate DataType="vm:AssistantViewModel">
+        <views:PracticeView />
+      </DataTemplate>
+    </ContentControl.DataTemplates>
+  </ContentControl>
 
 </Window>

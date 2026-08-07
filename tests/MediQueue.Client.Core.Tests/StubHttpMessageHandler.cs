@@ -20,6 +20,21 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
     /// <summary>The most recent request.</summary>
     public HttpRequestMessage LastRequest => Requests[^1];
 
+    /// <summary>
+    /// The body of every request, captured while it was still readable.
+    /// </summary>
+    /// <remarks>
+    /// The client disposes each request once it has been sent, which disposes
+    /// its content with it — so reading <c>LastRequest.Content</c> afterwards
+    /// throws <c>ObjectDisposedException</c>. Recording the text here is the
+    /// honest fix: the assertion is about what was sent, and what was sent is a
+    /// string, not a live object.
+    /// </remarks>
+    public List<string> Bodies { get; } = [];
+
+    /// <summary>The body of the most recent request, or empty if it had none.</summary>
+    public string LastBody => Bodies.Count > 0 ? Bodies[^1] : string.Empty;
+
     /// <summary>Queues a JSON response.</summary>
     /// <param name="status">The status code.</param>
     /// <param name="json">The body.</param>
@@ -52,6 +67,18 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
     /// <returns>The client.</returns>
     public HttpClient CreateClient() =>
         new(this, disposeHandler: false) { BaseAddress = new Uri("http://localhost:5123/") };
+
+    private Exception? _transportFailure;
+
+    /// <summary>Makes every later send fail, as an unreachable server does.</summary>
+    /// <param name="failure">What the transport throws.</param>
+    /// <returns>This handler, for chaining.</returns>
+    public StubHttpMessageHandler FailTransportWith(Exception failure)
+    {
+        _transportFailure = failure;
+
+        return this;
+    }
 
     private TaskCompletionSource? _gate;
 
@@ -88,9 +115,18 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
     {
         Requests.Add(request);
 
+        Bodies.Add(request.Content is null
+            ? string.Empty
+            : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+
         if (_gate is { } gate)
         {
             await gate.Task.ConfigureAwait(false);
+        }
+
+        if (_transportFailure is { } failure)
+        {
+            throw failure;
         }
 
         return _responses.Count > 0

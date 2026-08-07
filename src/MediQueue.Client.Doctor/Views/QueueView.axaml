@@ -34,7 +34,42 @@
       </StackPanel>
     </StackPanel>
 
-    <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0" Spacing="8">
+    <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0" Spacing="10">
+
+      <!-- Enabled from the status the server last reported. That is
+           presentation; whether a transition is legal is the server's, and its
+           409 is what the doctor sees if the two ever disagree. -->
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Call in" Command="{Binding CallInCommand}" IsEnabled="{Binding CanCallIn}" />
+        <Button Content="Record diagnosis"
+                Command="{Binding RecordDiagnosisCommand}"
+                IsEnabled="{Binding CanRecordDiagnosis}" />
+        <Button Content="Release" Command="{Binding ReleaseCommand}" IsEnabled="{Binding CanRelease}" />
+      </StackPanel>
+
+      <!-- The detail, and the only place this application asks for it. Shown
+           while the selected visit is being treated. -->
+      <Border IsVisible="{Binding SelectedDetail, Converter={x:Static ObjectConverters.IsNotNull}}"
+              BorderBrush="#22000000" BorderThickness="1" CornerRadius="4" Padding="12">
+        <StackPanel Spacing="6" DataContext="{Binding SelectedDetail}">
+          <TextBlock Text="{Binding PatientFullName}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding PatientAddress}" Opacity="0.75" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Complaint}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
+      <TextBox PlaceholderText="Diagnosis"
+               Text="{Binding DiagnosisText}"
+               AcceptsReturn="True"
+               Height="64"
+               TextWrapping="Wrap"
+               IsVisible="{Binding SelectedDetail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <TextBlock Text="{Binding ActionError}"
+                 IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}"
+                 Foreground="#B3261E"
+                 TextWrapping="Wrap" />
+
       <Button Content="Refresh"
               Command="{Binding RefreshCommand}"
               IsEnabled="{Binding !IsBusy}"
@@ -64,22 +99,23 @@
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center" />
 
-        <ScrollViewer IsVisible="{Binding !IsEmpty}">
-          <ItemsControl ItemsSource="{Binding Rows}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate DataType="vm:QueueRow">
-                <Border BorderBrush="#22000000" BorderThickness="0,0,0,1" Padding="0,8">
-                  <Grid ColumnDefinitions="80,*,140,110">
-                    <TextBlock Grid.Column="0" Text="{Binding QueuedAtDisplay}" FontFamily="monospace" />
-                    <TextBlock Grid.Column="1" Text="{Binding PatientFullName}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="2" Text="{Binding Taj}" FontFamily="monospace" />
-                    <TextBlock Grid.Column="3" Text="{Binding Status}" Opacity="0.8" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+        <!-- A ListBox rather than an ItemsControl now: the doctor acts on the
+             selected patient, so the list has to have a selection. -->
+        <ListBox IsVisible="{Binding !IsEmpty}"
+                 ItemsSource="{Binding Rows}"
+                 SelectedItem="{Binding SelectedRow}"
+                 Background="Transparent">
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="vm:QueueRow">
+              <Grid ColumnDefinitions="80,*,140,110">
+                <TextBlock Grid.Column="0" Text="{Binding QueuedAtDisplay}" FontFamily="monospace" />
+                <TextBlock Grid.Column="1" Text="{Binding PatientFullName}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Text="{Binding Taj}" FontFamily="monospace" />
+                <TextBlock Grid.Column="3" Text="{Binding StatusDisplay}" Opacity="0.8" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
       </Grid>
 
     </Grid>

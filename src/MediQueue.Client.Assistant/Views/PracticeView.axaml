@@ -1,0 +1,173 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MediQueue.Client.Core.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="680"
+             x:Class="MediQueue.Client.Assistant.Views.PracticeView"
+             x:DataType="vm:AssistantViewModel">
+
+  <DockPanel Margin="20">
+
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,14">
+      <TextBlock Text="{Binding AssistantName}" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock Text="Register arrivals, route them to a specialty, and watch the practice." Opacity="0.7" />
+
+      <!-- The same connection indicator the doctor's window carries, and for
+           the same reason: reconnect restores the socket but replays nothing. -->
+      <StackPanel Orientation="Horizontal" Spacing="6" DataContext="{Binding Practice}">
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="#2E7D32" IsVisible="{Binding IsLive}" />
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="#B3261E" IsVisible="{Binding !IsLive}" />
+        <TextBlock Text="{Binding ConnectionStatus}" Opacity="0.7" FontSize="12" />
+      </StackPanel>
+    </StackPanel>
+
+    <Grid ColumnDefinitions="340,20,*">
+
+      <!-- ── Register ───────────────────────────────────────────────────── -->
+      <Border Grid.Column="0" BorderBrush="#22000000" BorderThickness="1" CornerRadius="4" Padding="16">
+        <ScrollViewer>
+          <StackPanel Spacing="8" DataContext="{Binding Registration}">
+            <TextBlock Text="Register a patient" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,6" />
+
+            <!--
+              Every message below is the server's own. The client submits what
+              was typed and renders what came back against the box that caused
+              it; the TAJ and name rules live in the domain and are not
+              restated here.
+            -->
+            <TextBlock Text="Name" />
+            <TextBox Text="{Binding FullName}" PlaceholderText="Kovács Anna" />
+            <TextBlock Text="{Binding FullNameError}" Foreground="#B3261E" FontSize="12" TextWrapping="Wrap"
+                       IsVisible="{Binding FullNameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <TextBlock Text="Address" />
+            <TextBox Text="{Binding Address}" PlaceholderText="1052 Budapest, Váci utca 12." />
+            <TextBlock Text="{Binding AddressError}" Foreground="#B3261E" FontSize="12" TextWrapping="Wrap"
+                       IsVisible="{Binding AddressError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <TextBlock Text="TAJ number" />
+            <TextBox Text="{Binding Taj}" PlaceholderText="123-456-788" />
+            <TextBlock Text="{Binding TajError}" Foreground="#B3261E" FontSize="12" TextWrapping="Wrap"
+                       IsVisible="{Binding TajError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <TextBlock Text="Complaint" />
+            <TextBox Text="{Binding Complaint}" AcceptsReturn="True" Height="56" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding ComplaintError}" Foreground="#B3261E" FontSize="12" TextWrapping="Wrap"
+                       IsVisible="{Binding ComplaintError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <TextBlock Text="Specialty" />
+            <ComboBox ItemsSource="{Binding Specialties}"
+                      SelectedItem="{Binding SelectedSpecialty}"
+                      HorizontalAlignment="Stretch">
+              <ComboBox.ItemTemplate>
+                <DataTemplate DataType="vm:SpecialtyChoice">
+                  <TextBlock Text="{Binding Name}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Button Content="Register"
+                    Command="{Binding SubmitCommand}"
+                    IsEnabled="{Binding CanSubmit}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Margin="0,10,0,0" />
+
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="#B3261E" TextWrapping="Wrap"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <!-- ── Unrouted, then the queues ──────────────────────────────────── -->
+      <Grid Grid.Column="2" RowDefinitions="Auto,240,Auto,*">
+
+        <TextBlock Grid.Row="0" Text="Waiting to be routed" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,6" />
+
+        <Border Grid.Row="1" BorderBrush="#22000000" BorderThickness="1" CornerRadius="4" Padding="10">
+          <DockPanel DataContext="{Binding Practice}">
+
+            <TextBlock DockPanel.Dock="Bottom" Text="{Binding ActionError}"
+                       Foreground="#B3261E" TextWrapping="Wrap" Margin="0,6,0,0"
+                       IsVisible="{Binding ActionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <!-- Nobody unrouted is the ordinary case, and it says so. -->
+            <TextBlock Text="Everybody who has arrived is in a queue."
+                       IsVisible="{Binding NobodyIsUnrouted}"
+                       Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+            <ListBox IsVisible="{Binding !NobodyIsUnrouted}"
+                     ItemsSource="{Binding Unrouted}"
+                     SelectedItem="{Binding $parent[UserControl].((vm:AssistantViewModel)DataContext).SelectedUnrouted}"
+                     Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate DataType="vm:QueueRow">
+                  <Grid ColumnDefinitions="70,*,130">
+                    <TextBlock Grid.Column="0" Text="{Binding QueuedAtDisplay}" FontFamily="monospace" />
+                    <TextBlock Grid.Column="1" Text="{Binding PatientFullName}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="{Binding Taj}" FontFamily="monospace" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </Border>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,10,0,14">
+          <ComboBox ItemsSource="{Binding Specialties}"
+                    SelectedItem="{Binding RouteTo}"
+                    MinWidth="200"
+                    PlaceholderText="Route to…">
+            <ComboBox.ItemTemplate>
+              <DataTemplate DataType="vm:SpecialtyChoice">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Content="Route" Command="{Binding AssignCommand}" IsEnabled="{Binding CanAssign}" />
+          <Button Content="Withdraw" Command="{Binding DeleteCommand}" IsEnabled="{Binding CanDelete}" />
+          <Button Content="Refresh" Command="{Binding Practice.RefreshCommand}" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="3">
+          <ItemsControl ItemsSource="{Binding Practice.Queues}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:DoctorQueueViewModel">
+                <Border BorderBrush="#22000000" BorderThickness="1" CornerRadius="4"
+                        Padding="12" Margin="0,0,0,10">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding DoctorFullName}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding SpecialtyName}" Opacity="0.6" FontSize="12" Margin="0,0,0,4" />
+
+                    <!-- An empty queue is information: it is how an assistant
+                         sees that a doctor is free. -->
+                    <TextBlock Text="Nobody waiting." IsVisible="{Binding IsEmpty}" Opacity="0.6" FontSize="12" />
+
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:QueueRow">
+                          <Grid ColumnDefinitions="70,*,130,100" Margin="0,2">
+                            <TextBlock Grid.Column="0" Text="{Binding QueuedAtDisplay}" FontFamily="monospace" />
+                            <TextBlock Grid.Column="1" Text="{Binding PatientFullName}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Text="{Binding Taj}" FontFamily="monospace" />
+                            <TextBlock Grid.Column="3" Text="{Binding StatusDisplay}" Opacity="0.75" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+      </Grid>
+    </Grid>
+  </DockPanel>
+
+</UserControl>

@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MediQueue.Client.Core.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="520"
+             x:Class="MediQueue.Client.Assistant.Views.LoginView"
+             x:DataType="vm:LoginViewModel">
+
+  <StackPanel Margin="48" Spacing="12" VerticalAlignment="Center" MaxWidth="360">
+    <TextBlock Text="MediQueue" FontSize="26" FontWeight="SemiBold" />
+    <TextBlock Text="Sign in to register and route patients." Opacity="0.7" Margin="0,0,0,12" />
+
+    <TextBlock Text="Username" />
+    <TextBox Text="{Binding Username}" PlaceholderText="horvath.anna" />
+
+    <TextBlock Text="Password" />
+    <TextBox Text="{Binding Password}" PasswordChar="•" />
+
+    <Button Content="Sign in"
+            Command="{Binding SignInCommand}"
+            IsEnabled="{Binding !IsBusy}"
+            HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Center"
+            Margin="0,12,0,0" />
+
+    <TextBlock Text="Signing in…" IsVisible="{Binding IsBusy}" Opacity="0.7" />
+
+    <!-- The server's own sentence. It says "Invalid username or password" and
+         deliberately not which of the two. -->
+    <TextBlock Text="{Binding ErrorMessage}"
+               IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+               Foreground="#B3261E"
+               TextWrapping="Wrap" />
+  </StackPanel>
+
+</UserControl>

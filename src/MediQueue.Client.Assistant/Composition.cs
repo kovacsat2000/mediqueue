@@ -5,7 +5,7 @@ using MediQueue.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace MediQueue.Client.Doctor;
+namespace MediQueue.Client.Assistant;
 
 /// <summary>
 /// The composition root: the one place that knows how the parts fit together.
@@ -36,13 +36,13 @@ public static class Composition
 
         // The address is configuration, never a literal in the client.
         //
-        // Registered as IDoctorApi and nothing else. The concrete client also
-        // implements IAssistantApi, and deliberately is not registered as it —
-        // so no screen in this application can resolve its way to an endpoint
-        // this role has no business calling.
+        // Registered as IAssistantApi and nothing else. The concrete client also
+        // implements IDoctorApi, and deliberately is not registered as it — so
+        // this application has no way to reach an endpoint returning a
+        // diagnosis, by resolution or by compilation.
         services.AddHttpClient<MediQueueApiClient>(client => client.BaseAddress = new Uri(baseAddress));
-        services.AddSingleton<IDoctorApi>(provider => provider.GetRequiredService<MediQueueApiClient>());
-        services.AddSingleton<ILoginApi>(provider => provider.GetRequiredService<IDoctorApi>());
+        services.AddSingleton<IAssistantApi>(provider => provider.GetRequiredService<MediQueueApiClient>());
+        services.AddSingleton<ILoginApi>(provider => provider.GetRequiredService<IAssistantApi>());
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IAuthSession, AuthSession>();
@@ -54,19 +54,22 @@ public static class Composition
             new Uri(new Uri(baseAddress), "hubs/queue"),
             provider.GetRequiredService<IAuthSession>()));
 
-        // This application admits doctors only, and says so to anybody else.
+        // This application admits assistants only, and says so to anybody else.
         services.AddSingleton(provider => new LoginViewModel(
             provider.GetRequiredService<ILoginApi>(),
             provider.GetRequiredService<IAuthSession>(),
-            UserRole.Doctor));
+            UserRole.Assistant));
 
-        services.AddSingleton<QueueViewModel>();
+        services.AddSingleton<RegistrationViewModel>();
+        services.AddSingleton<PracticeViewModel>();
+        services.AddSingleton<AssistantViewModel>();
 
         services.AddSingleton(provider =>
         {
-            var queue = provider.GetRequiredService<QueueViewModel>();
+            var assistant = provider.GetRequiredService<AssistantViewModel>();
 
-            return new ShellViewModel(provider.GetRequiredService<LoginViewModel>(), queue, queue.StartCommand);
+            return new ShellViewModel(
+                provider.GetRequiredService<LoginViewModel>(), assistant, assistant.StartCommand);
         });
 
         return services.BuildServiceProvider();

@@ -1,15 +1,14 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="MediQueue.Client.Assistant.App"
-             xmlns:local="using:MediQueue.Client.Assistant"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+  <!--
+    The template's reflection-based ViewLocator is gone: the shell has exactly
+    two screens, and two explicit DataTemplates in MainWindow say which view
+    belongs to which view model without a name-mangling convention in between.
+  -->
 
-    <Application.DataTemplates>
-        <local:ViewLocator />
-    </Application.DataTemplates>
-
-    <Application.Styles>
-        <FluentTheme />
-    </Application.Styles>
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
 </Application>
