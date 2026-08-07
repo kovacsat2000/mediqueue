@@ -53,18 +53,51 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
     public HttpClient CreateClient() =>
         new(this, disposeHandler: false) { BaseAddress = new Uri("http://localhost:5123/") };
 
+    private TaskCompletionSource? _gate;
+
+    /// <summary>
+    /// Holds every response open until the returned handle is released.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Without this the handler returns an already-completed task, so an
+    /// <c>await</c> on it never yields and a refresh runs from its first line to
+    /// its last without the scheduler getting a look in. That makes it
+    /// impossible for anything to interleave with a refresh — fine for most
+    /// tests here, and fatal for the two whose entire subject is the
+    /// interleaving.
+    /// </para>
+    /// <para>
+    /// Found by mutation testing: removing the very lock those two tests exist
+    /// to exercise killed neither of them. They were green and asserting
+    /// nothing, which is D-45 in a concurrency test.
+    /// </para>
+    /// </remarks>
+    /// <returns>The gate. Complete it to let the held responses through.</returns>
+    public TaskCompletionSource HoldResponses()
+    {
+        _gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        return _gate;
+    }
+
     /// <inheritdoc />
-    protected override Task<HttpResponseMessage> SendAsync(
+    protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
         Requests.Add(request);
 
-        return Task.FromResult(_responses.Count > 0
+        if (_gate is { } gate)
+        {
+            await gate.Task.ConfigureAwait(false);
+        }
+
+        return _responses.Count > 0
             ? _responses.Dequeue()
             : new HttpResponseMessage(HttpStatusCode.NotImplemented)
             {
                 Content = new StringContent("the test queued no response for this request"),
-            });
+            };
     }
 }

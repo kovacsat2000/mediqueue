@@ -185,15 +185,24 @@ public class RealtimeQueueTests
         // The P4b bug from the other side. The refresh holds its lock across the
         // HTTP call as well as the row swap, so a push cannot land between the
         // fetch and the swap; it applies strictly before or strictly after.
+        // The response is held open so the refresh is genuinely in flight when
+        // the push arrives. Without that the handler completes synchronously,
+        // the refresh never yields, and there is no interleaving to test — which
+        // is what this test used to do, silently.
         var visit = AVisit(name: "Kovács Anna");
+        var gate = _handler.HoldResponses();
 
         _handler.Respond(HttpStatusCode.OK, $"[{Json(visit)}]");
 
         var queue = AQueue();
 
         var refreshing = queue.RefreshAsync(default);
+        await WaitUntilAsync(() => _handler.Requests.Count == 1);
+
+        // Mid-fetch: the refresh is blocked inside the HTTP call.
         _realtime.PushQueued(visit);
 
+        gate.SetResult();
         await refreshing;
         await SettleAsync(() => queue.Rows.Count != 1);
 
@@ -212,17 +221,35 @@ public class RealtimeQueueTests
         var alreadyThere = AVisit(name: "Régi Beteg", queuedAt: EightUtc);
         var arriving = AVisit(name: "Új Beteg", queuedAt: EightUtc.AddMinutes(20));
 
+        var gate = _handler.HoldResponses();
         _handler.Respond(HttpStatusCode.OK, $"[{Json(alreadyThere)}]");
 
         var queue = AQueue();
 
         var refreshing = queue.RefreshAsync(default);
+        await WaitUntilAsync(() => _handler.Requests.Count == 1);
+
+        // Arrives while the fetch is outstanding, so it is a row the response
+        // cannot possibly contain. Applied without the lock it would be wiped by
+        // the refresh's Clear and lost for good.
         _realtime.PushQueued(arriving);
 
+        gate.SetResult();
         await refreshing;
         await SettleAsync(() => queue.Rows.Count == 2);
 
         queue.Rows.Select(row => row.PatientFullName).ShouldBe(["Régi Beteg", "Új Beteg"]);
+    }
+
+    /// <summary>Waits for a condition, so a test never depends on a guessed delay.</summary>
+    private static async Task WaitUntilAsync(Func<bool> until)
+    {
+        for (var attempt = 0; attempt < 200 && !until(); attempt++)
+        {
+            await Task.Delay(5);
+        }
+
+        until().ShouldBeTrue("the awaited condition never became true");
     }
 
     [Fact]
