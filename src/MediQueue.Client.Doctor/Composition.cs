@@ -1,4 +1,5 @@
 using MediQueue.Client.Core.Api;
+using MediQueue.Client.Core.Realtime;
 using MediQueue.Client.Core.ViewModels;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,13 @@ public static class Composition
 
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IAuthSession, AuthSession>();
+
+        // The hub lives under the same host as the API, so its address is
+        // derived rather than configured separately — two settings that must
+        // agree are one setting somebody will eventually get wrong.
+        services.AddSingleton<IQueueConnection>(provider => new QueueConnection(
+            new Uri(new Uri(baseAddress), "hubs/queue"),
+            provider.GetRequiredService<IAuthSession>()));
 
         services.AddSingleton<LoginViewModel>();
         services.AddSingleton<QueueViewModel>();

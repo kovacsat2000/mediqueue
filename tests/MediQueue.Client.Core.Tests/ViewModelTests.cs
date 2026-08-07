@@ -67,6 +67,8 @@ public class ViewModelTests
         ]
         """;
 
+    private readonly FakeQueueConnection _realtime = new();
+
     private static FakeTimeProvider InZone(string timeZoneId)
     {
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 8, 6, 8, 0, 0, TimeSpan.Zero));
@@ -82,7 +84,7 @@ public class ViewModelTests
         // than recomputed with the production formula, because a test that runs
         // the same conversion it is checking asserts nothing.
         _handler.Respond(HttpStatusCode.OK, QueueAtEightUtc);
-        var queue = new QueueViewModel(Api, _session, InZone("Europe/Budapest"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
 
         await queue.RefreshAsync(default);
 
@@ -99,7 +101,7 @@ public class ViewModelTests
         // Four literals, four zones, one wire value. If the conversion were
         // dropped, three of these would fail.
         _handler.Respond(HttpStatusCode.OK, QueueAtEightUtc);
-        var queue = new QueueViewModel(Api, _session, InZone(zone));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone(zone));
 
         await queue.RefreshAsync(default);
 
@@ -110,7 +112,7 @@ public class ViewModelTests
     public async Task The_row_carries_the_patient_and_the_complaint()
     {
         _handler.Respond(HttpStatusCode.OK, QueueAtEightUtc);
-        var queue = new QueueViewModel(Api, _session, InZone("Europe/Budapest"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
 
         await queue.RefreshAsync(default);
 
@@ -124,7 +126,7 @@ public class ViewModelTests
     public async Task An_empty_queue_is_reported_as_empty_rather_than_left_blank()
     {
         _handler.Respond(HttpStatusCode.OK, "[]");
-        var queue = new QueueViewModel(Api, _session, InZone("Europe/Budapest"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
 
         await queue.RefreshAsync(default);
 
@@ -140,7 +142,7 @@ public class ViewModelTests
             HttpStatusCode.Forbidden,
             """{"title":"You may not do that","status":403,"detail":"This is not your queue.","traceId":"00-abc-def-00"}""",
             "application/problem+json");
-        var queue = new QueueViewModel(Api, _session, InZone("Europe/Budapest"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
 
         await queue.RefreshAsync(default);
 
@@ -153,7 +155,7 @@ public class ViewModelTests
     public async Task A_failed_refresh_does_not_leave_the_spinner_running()
     {
         _handler.RespondEmpty(HttpStatusCode.InternalServerError);
-        var queue = new QueueViewModel(Api, _session, InZone("UTC"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("UTC"));
 
         await queue.RefreshAsync(default);
 
@@ -235,7 +237,7 @@ public class ViewModelTests
     {
         _handler.Respond(HttpStatusCode.OK, DoctorLogin).Respond(HttpStatusCode.OK, "[]");
         var login = new LoginViewModel(Api, _session);
-        var queue = new QueueViewModel(Api, _session, InZone("Europe/Budapest"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
         var shell = new ShellViewModel(login, queue);
 
         shell.Current.ShouldBeSameAs(login);
@@ -256,7 +258,7 @@ public class ViewModelTests
         // refreshes at the same time used to clear-then-add alongside it, so the
         // list ended up with each patient once per refresh in flight.
         _handler.Respond(HttpStatusCode.OK, QueueAtEightUtc).Respond(HttpStatusCode.OK, QueueAtEightUtc);
-        var queue = new QueueViewModel(Api, _session, InZone("Europe/Budapest"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
 
         await Task.WhenAll(
             queue.RefreshAsync(default),
@@ -270,24 +272,29 @@ public class ViewModelTests
     {
         _handler.Respond(HttpStatusCode.OK, DoctorLogin).Respond(HttpStatusCode.OK, QueueAtEightUtc);
         var login = new LoginViewModel(Api, _session);
-        var queue = new QueueViewModel(Api, _session, InZone("Europe/Budapest"));
+        var queue = new QueueViewModel(Api, _session, _realtime, InZone("Europe/Budapest"));
         _ = new ShellViewModel(login, queue);
 
         login.Username = "kovacs.istvan";
         login.Password = "MediQueue123!";
         await login.SignInAsync(default);
 
-        // The shell drives the refresh through the command, which owns the task
+        // The shell drives the start through the command, which owns the task
         // — an async lambda on an event would be fire-and-forget and its
         // failures would go nowhere.
         // Discarded rather than bare: Shouldly returns the value it checked, and
         // an unawaited Task-typed expression statement is CS4014.
-        var running = queue.RefreshCommand.ExecutionTask;
+        var running = queue.StartCommand.ExecutionTask;
         _ = running.ShouldNotBeNull();
         await running;
 
         queue.Rows.Count.ShouldBe(1);
         queue.IsBusy.ShouldBeFalse();
+
+        // Signing in both opens the push channel and loads the list, in that
+        // order, so nothing happening during the fetch is missed.
+        _realtime.StartCount.ShouldBe(1);
+        queue.IsLive.ShouldBeTrue();
     }
 
     private sealed class UnreachableHandler : HttpMessageHandler

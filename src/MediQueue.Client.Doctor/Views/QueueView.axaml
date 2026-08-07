@@ -17,6 +17,21 @@
     <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,16">
       <TextBlock Text="{Binding DoctorName}" FontSize="22" FontWeight="SemiBold" />
       <TextBlock Text="Waiting list, in arrival order." Opacity="0.7" />
+
+      <!--
+        The connection state, in words. Automatic reconnect restores the socket
+        but replays nothing, so a doctor is entitled to know whether the list in
+        front of them is still being kept current or is a snapshot.
+      -->
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <!-- Two ellipses rather than a value converter: one binding each, and
+             nothing to register in a resource dictionary. -->
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="#2E7D32" IsVisible="{Binding IsLive}" />
+        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                 Fill="#B3261E" IsVisible="{Binding !IsLive}" />
+        <TextBlock Text="{Binding ConnectionStatus}" Opacity="0.7" FontSize="12" />
+      </StackPanel>
     </StackPanel>
 
     <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0" Spacing="8">

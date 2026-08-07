@@ -36,6 +36,29 @@ public interface IAuthSession
     /// <summary>Attaches the bearer token to a request, if there is one.</summary>
     /// <param name="request">The outgoing request.</param>
     void Authorize(HttpRequestMessage request);
+
+    /// <summary>
+    /// Yields the token for the realtime connection, and for nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The one deliberate widening of this interface, planned in D-55 and spent
+    /// here. A WebSocket cannot carry an <c>Authorization</c> header, so
+    /// SignalR needs the token as a value — there is no way to keep the
+    /// "authorise this request" shape for that transport.
+    /// </para>
+    /// <para>
+    /// <strong>It is a named method and not a property on purpose.</strong> A
+    /// <c>Token</c> property is reachable by a serialiser, a debugger view, an
+    /// object dumper and anything that logs "the session"; a method with this
+    /// name is reachable only by code that says out loud what it wants it for,
+    /// and every use is one grep away. The asynchronous signature is what
+    /// SignalR's own <c>AccessTokenProvider</c> expects and is where a refresh
+    /// would go if this system ever had one.
+    /// </para>
+    /// </remarks>
+    /// <returns>The token, or <c>null</c> if nobody is signed in.</returns>
+    Task<string?> GetTokenForRealtimeAsync();
 }
 
 /// <summary>The in-memory session.</summary>
@@ -75,4 +98,7 @@ public sealed class AuthSession : IAuthSession
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
         }
     }
+
+    /// <inheritdoc />
+    public Task<string?> GetTokenForRealtimeAsync() => Task.FromResult(_accessToken);
 }

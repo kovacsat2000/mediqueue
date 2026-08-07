@@ -28,7 +28,7 @@ public sealed partial class ShellViewModel : ObservableObject
             // Through the command rather than the method: an async lambda on an
             // event is fire-and-forget, and its exceptions would go nowhere.
             // The command owns the running task and the concurrency guard.
-            _queue.RefreshCommand.Execute(null);
+            _queue.StartCommand.Execute(null);
         };
     }
 
