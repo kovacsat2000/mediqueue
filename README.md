@@ -60,6 +60,11 @@ dotnet restore
 dotnet build
 dotnet test
 
+# Check that every unpushed commit restores, builds, passes and starts — run
+# before pushing. A build alone would not catch a commit that compiles and
+# whose container cannot be constructed.
+scripts/verify-history.sh
+
 # Run the API — http://localhost:5123
 dotnet run --project src/MediQueue.Api
 

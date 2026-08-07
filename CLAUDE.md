@@ -18,7 +18,7 @@ It is a proof of concept built to be **presented and defended live, line by line
    - **Seed and test data *values*** — patient and doctor names, addresses, specialty names, complaints, diagnoses. These are Hungarian, so the demo reads naturally and so the tests exercise the character set the system actually receives. `"Kovács Anna"` as a test value is data, not prose.
    - **Legal citations** keep their official Hungarian designation (`1996. évi XX. törvény, 2. sz. melléklet`), the way any statute is cited untranslated. The surrounding explanation is English.
 2. **No time-based scoping.** Never propose cutting, deferring, or timeboxing work because of time. Time is not a constraint in this project. If something should be built, build it.
-3. **Never invent version numbers or API shapes from memory.** Check the actual installed SDK, the actual package version, and the actual API before using it. If a package's current version is unknown, add it with `dotnet add package <name>` and let NuGet resolve, then record the resolved version in `Directory.Packages.props`.
+3. **Never invent version numbers or API shapes from memory.** Check the actual installed SDK, the actual package version, and the actual API before using it. If a package's current version is unknown, add it with `dotnet add package <n>` and let NuGet resolve, then record the resolved version in `Directory.Packages.props`.
 4. **Do not silently change a decision recorded in `context/decisions.md`.** If a decision turns out to be wrong, stop, explain why, and let the controller session re-decide.
 5. **Do not commit secrets.** Development JWT signing keys and seed passwords live in `appsettings.Development.json` and are documented in the README as demo credentials — that is intentional and fine. Nothing else.
 6. **If a brief asks for something you cannot do, say so plainly.** Do not approximate it and report success. Screen capture and UI automation are not available in this environment; anything needing human eyes belongs to Attila and the brief should have said so.
@@ -66,7 +66,7 @@ dotnet run --project src/MediQueue.Client.Doctor         # doctor desktop app
 
 # --- EF Core (dotnet-ef is a pinned local tool) ---------------------------
 dotnet tool restore
-dotnet ef migrations add <Name> \
+dotnet ef migrations add <n> \
   --project src/MediQueue.Infrastructure \
   --startup-project src/MediQueue.Api
 dotnet ef database update \
@@ -86,8 +86,8 @@ dotnet format                      # run before every commit
 Domain        → (nothing)                          entities, value objects, state machine, rules
 Contracts     → (nothing)                          DTOs and wire enums, shared with the clients
 Application   → Domain, Contracts                  use cases, service interfaces, application exceptions
-Infrastructure→ Application, Domain, Contracts     EF Core, migrations, audit interceptor, auth, SignalR
-Api           → Application, Infrastructure*       controllers, hubs, composition root, OpenAPI
+Infrastructure→ Application, Domain, Contracts     EF Core, migrations, audit interceptor, auth, QueueHub + notifier
+Api           → Application, Infrastructure*       controllers, hub *mapping*, composition root, OpenAPI
 Client.Core   → Contracts                          HTTP client, SignalR client, auth state, view models
 Client.*      → Client.Core, Contracts             Avalonia desktop shells
 ```
@@ -135,7 +135,10 @@ These come from the specification and from the decision log. Violating any of th
 18. **The auth session never yields the token as a string** (D-55). `IAuthSession` authorises an `HttpRequestMessage`; it has no token property, so no log line, message or serialiser can reach one. P6 widens it as a named method for SignalR's query string — never as a general property.
 19. **The audit tables carry no foreign keys** to `Patients`, `Users` or `Visits` (D-58). `EntityType` and `EntityId` are values. An audit entry must outlive what it describes — do not "fix" the missing relationships.
 20. **Redaction is uniform, including nulls** (D-60). An assistant sees `***` where a doctor sees `null`. The shape of the data leaks even when the value does not: a preserved null would distinguish a first diagnosis from a revised one.
-21. **No `IQueryable` and no DTO on a repository interface.** Repositories and directories return domain entities; mapping to `Contracts` happens in `Application`, because the role-scoped DTOs are a security boundary (D-19, D-38). No `IRepository<T>`.
+21. **The push payload is always `VisitSummaryDto`** — the type with no diagnosis member. No notifier method takes anything that could carry one, and recording a diagnosis publishes no event at all.
+22. **A guard for "must not throw" lives at the call site, not in the contract** (D-68). The services reach `IRealtimeNotifier` through the concrete `VisitAnnouncer`, which holds the single catch. Do not move it into an implementation — a substituted one would then be unguarded.
+23. **`ICurrentUser` inside `QueueHub` works because a WebSocket's lifetime sits inside its upgrade request** (D-66). Microsoft documents `IHttpContextAccessor` as unreliable in hubs. If you add an invokable hub method, re-run `A_hub_invocation_resolves_the_identity_the_same_way_a_request_does` rather than trusting it.
+24. **No `IQueryable` and no DTO on a repository interface.** Repositories and directories return domain entities; mapping to `Contracts` happens in `Application`, because the role-scoped DTOs are a security boundary (D-19, D-38). No `IRepository<T>`.
 
 ---
 
@@ -173,6 +176,8 @@ These come from the specification and from the decision log. Violating any of th
 - **Mutation testing is expected in every phase report**, not optional. For each new rule, state which mutant your tests actually kill and how many fail. A test that survives its mutant is not a test — and if a mutant fails the whole suite for a structural reason rather than an assertion, say so instead of claiming the number.
 - **Predict a mutant's kill count before running it, and write the prediction down first** (D-59). A prediction that matches is evidence the code is understood; a mismatch is the finding. And a rule observable on only one code path needs a test that constructs that path, or it reads as dead defensive code and someone will delete it.
 - **Every mechanism a brief asserts goes into the mutant list as "remove it."** Twice now a brief and a code comment have shared a causal claim that was simply false, and both times the mutant is what said so. If removing a mechanism kills nothing, either it is inert or the tests are.
+- **A test whose subject is timing, transport or concurrency must contain the mechanism that forces the condition** (D-65). Every convenient double removes it by default: a stub returning `Task.FromResult` never yields, so nothing can interleave; `TestServer` negotiates SignalR down to long polling, so a "WebSocket" test is not one. Neither is visible in the test body.
+- **A surviving mutant is acceptable only when the survival was predicted with its reason** (D-64). Otherwise it is a hole, not defence in depth.
 - **A mutant the compiler rejects is a structural kill, not a test count** (D-53). Deleting the last use of an injected dependency is a build error under warnings-as-errors, so some mutants cannot be written at all. Say so, then write the nearest variant that does compile and report *that* number.
 - **A negative test must be shown to fail for the stated reason, not merely to fail** (D-45). Choose the endpoint or fixture with the fewest other preconditions, so the asserted status can only come from the rule under test. Two P3 expiry tests asserted 401 and were green while asserting nothing, because the 401 came from "user not found" rather than from the expiry.
 - **A test that needs reflection to build a fixture is reporting a modelling gap.** Add the behaviour to the domain rather than reaching around it.
@@ -191,8 +196,10 @@ These come from the specification and from the decision log. Violating any of th
   `fix(api): return 409 with valid alternatives on invalid transition`
 - Never force-push to `main`. Never rewrite pushed history.
 - Run `dotnet format && dotnet build && dotnet test` before every commit. CI runs `dotnet format --verify-no-changes` as a build step, so an unformatted commit turns the pipeline red.
-- **Every commit must build.** In particular: a project is added to `MediQueue.sln` in the *same* commit that creates its `.csproj`. Never stage solution entries ahead of the projects they reference — that produces a commit that cannot restore, and it is exactly how the one defective commit in the P0 history happened.
-- Before committing a series, sanity-check it: `git stash` any work in progress, then build the intermediate states if a commit reorders or splits files across projects.
+- **Every commit must build, pass its tests, and start** (D-63). A build-only check is not enough: composition is not a compile-time property, and the second defective commit in this history compiles perfectly and cannot boot, because a seam landed one commit ahead of its registered implementation.
+  - **A seam and its implementation belong in one commit.** An interface with nothing registered against it is not a working system even though it is a compiling one.
+  - A project is added to `MediQueue.sln` in the *same* commit that creates its `.csproj`. Never stage solution entries ahead of the projects they reference — that is how the *first* defective commit happened.
+  - **Verify before you push, not after.** Run `scripts/verify-history.sh` over the phase's commit range. Two phases claimed per-commit verification while actually running it after the push, and found nothing by luck; the third did not get lucky.
 
 ---
 
