@@ -50,9 +50,12 @@ public static class Composition
         // The hub lives under the same host as the API, so its address is
         // derived rather than configured separately — two settings that must
         // agree are one setting somebody will eventually get wrong.
+        services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
+
         services.AddSingleton<IQueueConnection>(provider => new QueueConnection(
             new Uri(new Uri(baseAddress), "hubs/queue"),
-            provider.GetRequiredService<IAuthSession>()));
+            provider.GetRequiredService<IAuthSession>(),
+            provider.GetRequiredService<IUiDispatcher>()));
 
         // This application admits assistants only, and says so to anybody else.
         services.AddSingleton(provider => new LoginViewModel(

@@ -18,6 +18,7 @@ It is a proof of concept built to be **presented and defended live, line by line
    - **Seed and test data *values*** — patient and doctor names, addresses, specialty names, complaints, diagnoses. These are Hungarian, so the demo reads naturally and so the tests exercise the character set the system actually receives. `"Kovács Anna"` as a test value is data, not prose.
    - **Legal citations** keep their official Hungarian designation (`1996. évi XX. törvény, 2. sz. melléklet`), the way any statute is cited untranslated. The surrounding explanation is English.
 2. **No time-based scoping.** Never propose cutting, deferring, or timeboxing work because of time. Time is not a constraint in this project. If something should be built, build it.
+   - **One carve-out:** `docs/workplan.md` is a *deliverable* describing a hypothetical team, and the assignment asks it for sequencing and effort. Estimates belong in that document. The rule above governs how *this* project is executed, not what a deliverable about a different project may contain.
 3. **Never invent version numbers or API shapes from memory.** Check the actual installed SDK, the actual package version, and the actual API before using it. If a package's current version is unknown, add it with `dotnet add package <n>` and let NuGet resolve, then record the resolved version in `Directory.Packages.props`.
 4. **Do not silently change a decision recorded in `context/decisions.md`.** If a decision turns out to be wrong, stop, explain why, and let the controller session re-decide.
 5. **Do not commit secrets.** Development JWT signing keys and seed passwords live in `appsettings.Development.json` and are documented in the README as demo credentials — that is intentional and fine. Nothing else.
@@ -76,6 +77,9 @@ dotnet ef database update \
 # --- security & formatting ------------------------------------------------
 dotnet list package --vulnerable --include-transitive
 dotnet format                      # run before every commit
+
+# --- history verification (run BEFORE pushing, D-63) ----------------------
+./scripts/verify-history.sh        # every commit in @{upstream}..HEAD must restore, build, test and start
 ```
 
 ---
@@ -177,6 +181,8 @@ These come from the specification and from the decision log. Violating any of th
 - **Predict a mutant's kill count before running it, and write the prediction down first** (D-59). A prediction that matches is evidence the code is understood; a mismatch is the finding. And a rule observable on only one code path needs a test that constructs that path, or it reads as dead defensive code and someone will delete it.
 - **Every mechanism a brief asserts goes into the mutant list as "remove it."** Twice now a brief and a code comment have shared a causal claim that was simply false, and both times the mutant is what said so. If removing a mechanism kills nothing, either it is inert or the tests are.
 - **A test whose subject is timing, transport or concurrency must contain the mechanism that forces the condition** (D-65). Every convenient double removes it by default: a stub returning `Task.FromResult` never yields, so nothing can interleave; `TestServer` negotiates SignalR down to long polling, so a "WebSocket" test is not one. Neither is visible in the test body.
+- **Where the correct behaviour is *not* doing something, pin the absence with a test** (D-72): assert that a malformed value still enables the button, count the requests that must not be made, walk an interface by reflection. And a reflection test must walk **inherited** members — `GetMethods()` on an interface omits what it extends, so checking only declared members checks half a surface while claiming to check all of it.
+- **A checking tool is itself checked before its output is trusted** (D-69), against at least one input known to pass and one known to fail for each mode it claims to detect. A tool that reports a failure the subject does not have is as useless as one that hides a failure it does.
 - **A surviving mutant is acceptable only when the survival was predicted with its reason** (D-64). Otherwise it is a hole, not defence in depth.
 - **A mutant the compiler rejects is a structural kill, not a test count** (D-53). Deleting the last use of an injected dependency is a build error under warnings-as-errors, so some mutants cannot be written at all. Say so, then write the nearest variant that does compile and report *that* number.
 - **A negative test must be shown to fail for the stated reason, not merely to fail** (D-45). Choose the endpoint or fixture with the fewest other preconditions, so the asserted status can only come from the rule under test. Two P3 expiry tests asserted 401 and were green while asserting nothing, because the 401 came from "user not found" rather than from the expiry.

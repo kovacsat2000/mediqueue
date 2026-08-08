@@ -10,8 +10,12 @@ namespace MediQueue.Client.Core.Realtime;
 /// <remarks>
 /// <para>
 /// No UI framework is involved and none is needed: this is a client library
-/// raising events. Which thread a handler runs on is the shell's problem, and
-/// the shell is the only part of the system that knows a window exists.
+/// raising events. It does, however, decide <em>which thread</em> it raises
+/// them on — SignalR delivers on a thread-pool thread, and a view model that
+/// mutates a bound collection from there corrupts or crashes the window. The
+/// marshalling is therefore here, through <see cref="IUiDispatcher"/>, which
+/// the shells implement in one line and this project never has to know the
+/// shape of.
 /// </para>
 /// <para>
 /// <see cref="HubConnectionBuilder.WithAutomaticReconnect()"/> handles the
@@ -26,12 +30,22 @@ public sealed class QueueConnection : IQueueConnection
     private readonly HubConnection _connection;
     private RealtimeStatus _status = RealtimeStatus.Disconnected;
 
+    private readonly IUiDispatcher _dispatcher;
+
     /// <summary>Builds the connection. Nothing is opened until <see cref="StartAsync"/>.</summary>
     /// <param name="hubUri">Where the hub lives.</param>
     /// <param name="session">Supplies the token, through its one named accessor.</param>
-    public QueueConnection(Uri hubUri, IAuthSession session)
+    /// <param name="dispatcher">
+    /// Moves every raised event onto the user-interface thread. This is the one
+    /// place it happens, so that a subscriber added later inherits it instead of
+    /// having to remember it.
+    /// </param>
+    public QueueConnection(Uri hubUri, IAuthSession session, IUiDispatcher dispatcher)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(dispatcher);
+
+        _dispatcher = dispatcher;
 
         _connection = new HubConnectionBuilder()
             .WithUrl(hubUri, options =>
@@ -112,12 +126,24 @@ public sealed class QueueConnection : IQueueConnection
     /// <inheritdoc />
     public async ValueTask DisposeAsync() => await _connection.DisposeAsync().ConfigureAwait(false);
 
-    private void Forward<T>(string method, Action<T> raise) => _connection.On(method, raise);
+    /// <summary>
+    /// Subscribes to one hub method and raises its event on the UI thread.
+    /// </summary>
+    /// <remarks>
+    /// The marshalling is here rather than in each view model because this is
+    /// the boundary at which a background thread becomes the application. One
+    /// place, and no consumer can forget it.
+    /// </remarks>
+    private void Forward<T>(string method, Action<T> raise) =>
+        _connection.On<T>(method, payload => _dispatcher.Post(() => raise(payload)));
 
     private Task Report(RealtimeStatus status)
     {
+        // Also marshalled: Reconnecting and Closed are raised by SignalR's own
+        // threads, and Live arrives on whichever thread completed the start —
+        // measured at thread 8 while the caller was on thread 4.
         _status = status;
-        StatusChanged?.Invoke(this, status);
+        _dispatcher.Post(() => StatusChanged?.Invoke(this, status));
 
         return Task.CompletedTask;
     }
