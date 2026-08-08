@@ -73,10 +73,15 @@ Both windows already visible. Do not narrate the layout; they can see it.
 **Do:** In the **assistant** window, register a patient into **Belgyógyászat**.
 
 - Name `Tóth Erzsébet`, address `1052 Budapest, Váci utca 12.`, TAJ
-  `123-456-788` — *(any well-formed TAJ not already seeded; if it is refused as
-  a duplicate, change one digit)* — complaint `Fejfájás és szédülés`, specialty
+  **`999-999-990`**, complaint `Fejfájás és szédülés`, specialty
   **Belgyógyászat**.
 - Press **Register**.
+
+> **On that TAJ.** It is not in the seed, so it cannot collide however many
+> times the database has been used — and it is **checksum-valid**, so the
+> reserve beat that switches the statutory check digit on will not reject the
+> patient you just registered. Second patient: `888-888-880`, same properties.
+> Neither requires arithmetic in front of an audience.
 
 **Say, while pointing at the right-hand window:**
 

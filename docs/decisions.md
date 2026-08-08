@@ -416,14 +416,30 @@ cannot see composition.
 That is the price, and it came to one bug's worth — which was cheap, but it is
 not a guarantee the next one would be.
 
-**A second instance, later and worse.** SignalR delivers on a thread-pool
-thread; the view models mutate collections the windows bind to; and nothing
-marshalled to the UI thread. Three phases of tests missed it because the unit
-tests raise events on the test's own thread and the end-to-end drive was a
-console program with no UI thread to be on the wrong side of. It was found by
-asking the question explicitly rather than by any test, measured (a handler on
-thread 11, a connection created on thread 4), and fixed with a dispatcher
-abstraction the shells implement in one line.
+**A second instance, later.** SignalR delivers on a thread-pool thread; the view
+models mutate collections the windows bind to; and nothing marshalled to the UI
+thread. Three phases of tests missed it, because the unit tests raise events on
+the test's own thread and the end-to-end drive was a console program with no UI
+thread to be on the wrong side of. It was found by asking the question
+explicitly rather than by any test, measured (a handler on thread 11, a
+connection created on thread 4), and fixed with a dispatcher abstraction the
+shells implement in one line.
+
+**And then the claim about it was corrected, which is the part worth keeping.**
+"Both clients were one push away from a cross-thread failure" was written into
+three documents before it was checked. A headless Avalonia test now shows that
+Avalonia 12.1.1 does **not** raise when a bound `ObservableCollection` is
+mutated from a background thread — tried with a realised `ListBox` carrying a
+selection, which is exactly what the doctor's queue is. So the danger was
+*unproven*, not false: the framework's contract asks for UI-thread access and a
+real windowing backend may enforce it more strictly than the headless one, but
+nobody had measured it and the sentence claimed they had. What the test proves
+is the narrower, true thing — the push now arrives on Avalonia's own thread and
+reaches a control it is binding to.
+
+Writing the correction down was cheaper than defending the stronger sentence,
+and this project has spent nine phases arguing that a stated mechanism is a
+hypothesis until something measures it. It applies to its own claims too.
 
 ---
 

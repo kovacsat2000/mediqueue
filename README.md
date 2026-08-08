@@ -71,7 +71,7 @@ Exits non-zero naming the first thing that did not hold.
 
 ```bash
 dotnet build                        # warnings are errors
-dotnet test                         # 470 tests across four projects
+dotnet test                         # 473 tests across five projects
 dotnet format                       # CI runs --verify-no-changes
 
 scripts/verify-history.sh           # every unpushed commit restores, builds, tests and starts
@@ -186,6 +186,45 @@ This is where most of the reasoning lives.
 
 ---
 
+## How this was built
+
+Written with AI assistance, which the assignment permits and which is worth
+describing plainly — because the interesting part is not the tool, it is the
+method and what the method caught.
+
+The work ran as a **controller/executor loop**: a written brief in, a written
+report back, and a review that ruled on every deviation and every open question
+before the next brief was issued. Nine phases, each one reported against its own
+acceptance criteria. Every brief that turned out to be wrong was reported as
+wrong rather than worked around — twice a brief asserted a mechanism that a
+mutant then disproved.
+
+Four things were gates rather than intentions:
+
+- **Mutation testing per phase.** Change one thing, predict the kill count *and
+  the named victims first*, then measure. It found three tests that were green
+  and asserting nothing, two concurrency tests that could not observe the
+  condition they were named for, and twice it killed a *premise* that the brief
+  and the code comment shared.
+- **Per-commit verification.** `scripts/verify-history.sh` checks that every
+  commit restores, builds, passes **and starts**, and it was calibrated against
+  two known-bad commits before its output was trusted.
+- **A decision log written before the code**, with an admitted trade-off in
+  every entry — the curated version is `docs/decisions.md`.
+- **Warnings as errors, format as a CI gate**, and an analyzer that fails the
+  build if the domain layer reads a clock.
+
+And the record includes the failures, which is what makes the rest of it
+credible: **two commits reached the pushed history broken**, one that cannot
+restore and one that compiles perfectly and cannot start. Both are named in
+this file. The second is why the verification rule says "and starts" — it was
+written after that commit, not before it.
+
+**The architecture and every decision in it are mine, and both are defensible
+line by line.** That is the actual claim, and the repository is the evidence
+for it: the decision log, the reports, the mutants, and a history that was not
+tidied up.
+
 ## What is implemented
 
 The third column is the one that matters: a requirement is not done because
@@ -210,7 +249,7 @@ somebody says so.
 
 ## Testing
 
-**470 tests** across four projects, each with a rule about what it may touch.
+**473 tests** across five projects, each with a rule about what it may touch.
 
 | Project | Tests | May depend on |
 |---|---|---|
@@ -218,6 +257,7 @@ somebody says so.
 | `MediQueue.Application.Tests` | 86 | substituted collaborators only; no host, no database, no container |
 | `MediQueue.Client.Core.Tests` | 81 | a stubbed HTTP handler and a fake clock; **no UI framework** |
 | `MediQueue.Api.IntegrationTests` | 123 | `WebApplicationFactory` + real PostgreSQL in Testcontainers |
+| `MediQueue.Client.Ui.Tests` | 3 | the only project that starts Avalonia, headless — see below |
 
 There is no in-memory database provider anywhere. The integration suite starts a
 real PostgreSQL 17 container, because a suite that passes against a fake and
@@ -244,6 +284,22 @@ is evidence the code is understood; a mismatch is the finding.
 
 ---
 
+### The one test that starts a UI framework
+
+`MediQueue.Client.Ui.Tests` runs a headless Avalonia application to prove the
+last link in the push chain: a callback arriving on a background thread reaches
+a control Avalonia is binding to, on Avalonia's own thread, without an
+exception. Everything before that link is covered without a window, and
+`Client.Core` keeps its no-Avalonia rule — which is why this is a separate
+project rather than a package added to the existing one.
+
+It is also where a claim got corrected. Avalonia 12.1.1 does **not** refuse a
+bound collection mutated from a background thread, measured with a realised
+`ListBox` carrying a selection. So "the clients were one push away from a
+crash", which an earlier version of this file said, was unproven rather than
+false. The marshalling is still right — it is what the framework's contract asks
+for — but the test asserts only what it can show.
+
 ## Known limitations and honest trade-offs
 
 **Redaction is the one guarantee enforced by a branch rather than a type.**
@@ -261,6 +317,15 @@ default. The assignment defines the acceptance rule as format-only and its own
 example (`123-123-123`) fails the checksum. Silently tightening a rule the
 customer specified is a product decision, not an engineering one — so the rule
 is built and the switch is left in configuration.
+
+**The server is not hosted anywhere, and that is a decision rather than an
+unfinished job.** External hosting was the one optional bonus left unfilled. The
+demonstration runs locally, so a hosted instance would add a live network
+dependency inside a thirty-minute slot and buy nothing that the local path does
+not already show. The system is nonetheless built deployment-ready: PostgreSQL
+in Docker Compose, every address configuration-driven with no literal in any
+client, no dependency on a local file path, and migrations that run on start.
+What would be needed is a container image for the API and somewhere to run it.
 
 **No refresh tokens, no password lifecycle, no key rotation.** Tokens last eight
 hours and that is the whole session story.
@@ -351,7 +416,7 @@ everything.
 
 ```
 src/                     the system
-tests/                   four test projects
+tests/                   five test projects
 docs/
   workplan.md            the Tech Lead work plan — a deliverable in its own right
   decisions.md           the decisions worth defending, with their trade-offs

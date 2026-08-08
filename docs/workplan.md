@@ -33,6 +33,27 @@ Everything else fails loudly: a broken state transition throws, a broken query
 things onto me, and gives the juniors the loud ones**, which is also where they
 learn fastest because the feedback is immediate.
 
+**The criterion is about the task, not the area** — and getting that distinction
+wrong is how a lead ends up hoarding work. The question is not *"can this part
+of the system fail silently"* but **"does the task, as briefed, make the failure
+loud?"** Those give different answers, and the second one is the useful one.
+
+Value objects (B3) are the example. Validation on a national identifier fails
+silently, so by the first reading it is lead work. But a junior handed *"write
+`TajNumber`"* fails silently, whereas a junior handed the three specific traps —
+`\A`/`\z` instead of `^`/`$`, `[0-9]` instead of `\d`, NFC before the character
+rules — and asked to prove each one with a test **cannot**: the briefing has
+converted an invisible failure into a visible, learnable one. The task changed
+category because of how it was written down.
+
+That is also the honest limit of the split. It works while I can write a
+briefing that specific, which means it works where I already know the traps. For
+the audit interceptor I cannot — the judgement it needs (what to do when the
+actor is unknown) is not a list of gotchas but a decision about what the system
+owes its reader — and that is why it stays with me. **If somebody wants to argue
+a task across the line, the argument to make is that the briefing can carry
+it.**
+
 The second property is that the desktop clients cannot be built until there is
 something to talk to, and the push channel cannot be demonstrated until there
 are two clients. That makes the server the critical path and the clients the
