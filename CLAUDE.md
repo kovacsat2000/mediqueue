@@ -19,7 +19,7 @@ It is a proof of concept built to be **presented and defended live, line by line
    - **Legal citations** keep their official Hungarian designation (`1996. évi XX. törvény, 2. sz. melléklet`), the way any statute is cited untranslated. The surrounding explanation is English.
 2. **No time-based scoping.** Never propose cutting, deferring, or timeboxing work because of time. Time is not a constraint in this project. If something should be built, build it.
    - **One carve-out:** `docs/workplan.md` is a *deliverable* describing a hypothetical team, and the assignment asks it for sequencing and effort. Estimates belong in that document. The rule above governs how *this* project is executed, not what a deliverable about a different project may contain.
-3. **Never invent version numbers or API shapes from memory.** Check the actual installed SDK, the actual package version, and the actual API before using it. If a package's current version is unknown, add it with `dotnet add package <n>` and let NuGet resolve, then record the resolved version in `Directory.Packages.props`.
+3. **Never invent version numbers or API shapes from memory.** Check the actual installed SDK, the actual package version, and the actual API before using it. If a package's current version is unknown, add it with `dotnet add package PackageName` and let NuGet resolve, then record the resolved version in `Directory.Packages.props`.
 4. **Do not silently change a decision recorded in `context/decisions.md`.** If a decision turns out to be wrong, stop, explain why, and let the controller session re-decide.
 5. **Do not commit secrets.** Development JWT signing keys and seed passwords live in `appsettings.Development.json` and are documented in the README as demo credentials — that is intentional and fine. Nothing else.
 6. **If a brief asks for something you cannot do, say so plainly.** Do not approximate it and report success. Screen capture and UI automation are not available in this environment; anything needing human eyes belongs to Attila and the brief should have said so.
@@ -67,7 +67,7 @@ dotnet run --project src/MediQueue.Client.Doctor         # doctor desktop app
 
 # --- EF Core (dotnet-ef is a pinned local tool) ---------------------------
 dotnet tool restore
-dotnet ef migrations add <n> \
+dotnet ef migrations add MigrationName \
   --project src/MediQueue.Infrastructure \
   --startup-project src/MediQueue.Api
 dotnet ef database update \
@@ -184,6 +184,7 @@ These come from the specification and from the decision log. Violating any of th
 - **Every mechanism a brief asserts goes into the mutant list as "remove it."** Twice now a brief and a code comment have shared a causal claim that was simply false, and both times the mutant is what said so. If removing a mechanism kills nothing, either it is inert or the tests are.
 - **A test whose subject is timing, transport or concurrency must contain the mechanism that forces the condition** (D-65). Every convenient double removes it by default: a stub returning `Task.FromResult` never yields, so nothing can interleave; `TestServer` negotiates SignalR down to long polling, so a "WebSocket" test is not one. Neither is visible in the test body.
 - **Where the correct behaviour is *not* doing something, pin the absence with a test** (D-72): assert that a malformed value still enables the button, count the requests that must not be made, walk an interface by reflection. And a reflection test must walk **inherited** members — `GetMethods()` on an interface omits what it extends, so checking only declared members checks half a surface while claiming to check all of it.
+- **A measurement proves what it measures** (D-77). A probe showing that callbacks arrive on a different thread proves exactly that; it does not prove the framework will refuse them. Framework documentation is a reason to expect a failure, not evidence of one — say which of the two you have.
 - **A composition test written without the framework cannot see the framework's constraints** (D-74). The P7 end-to-end harness was a console program with no Avalonia in it, so it could not observe a UI-thread violation no matter how much of the system it exercised. If a test is meant to prove the composed application works, it needs the parts that impose constraints.
 - **A checking tool is itself checked before its output is trusted** (D-69), against at least one input known to pass and one known to fail for each mode it claims to detect. A tool that reports a failure the subject does not have is as useless as one that hides a failure it does.
 - **A surviving mutant is acceptable only when the survival was predicted with its reason** (D-64). Otherwise it is a hole, not defence in depth.
